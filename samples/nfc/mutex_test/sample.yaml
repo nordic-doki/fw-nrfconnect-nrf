@@ -1,0 +1,9 @@
+sample:
+  description: My test
+  name: my-test
+tests:
+  test_build:
+    build_only: true
+    build_on_all: true
+    platform_whitelist: nrf52840_pca10056
+    tags: ci_build
