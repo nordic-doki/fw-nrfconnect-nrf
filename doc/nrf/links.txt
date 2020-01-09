@@ -186,6 +186,7 @@
 .. _`GPS`: https://en.wikipedia.org/wiki/Global_Positioning_System
 .. _`A-GPS`: https://en.wikipedia.org/wiki/Assisted_GPS
 .. _`NMEA`: https://www.gpsworld.com/what-exactly-is-gps-nmea-data/
+.. _`OpenAMP`: https://github.com/OpenAMP/open-amp/
 
 .. _`EnOcean`: https://www.enocean.com
 .. _`Easyfit Single/Double Rocker Wall Switch for BLE - EWSSB/EWSDB`: https://www.enocean.com/en/products/enocean_modules_24ghz_ble/easyfit-single-double-rocker-wall-switch-for-ble-ewssb-ewsdb
