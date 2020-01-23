@@ -1,0 +1,149 @@
+#
+# Copyright (c) 2019 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menuconfig RTT_LITE_TRACE
+	bool "Enable RTT lite system tracing"
+	depends on HAS_SEGGER_RTT
+	select USE_SEGGER_RTT
+	select RTT_CONSOLE
+	select THREAD_MONITOR
+	select TRACING
+	select TRACING_CUSTOM
+	help
+	  Enable RTT lite system tracing module which sends system tracing
+	  events via RTT. It uses custom tracing format of traces that was
+	  designed to have low performance impact on system. Traces have to be
+	  converted to commonly used format on host side, e.g. Segger System
+	  View.
+
+if RTT_LITE_TRACE
+
+config RTT_LITE_TRACE_IRQ
+	bool "Trace IRQ enter and exit"
+	default y
+	help
+	  Put IRQ enter and exit in traces.
+
+config RTT_LITE_TRACE_SYNCHRO
+	bool "Trace threads synchronization calls"
+	default y
+	help
+	  Put threads synchronization calls, i.e. mutex and semafor handling
+	  in traces.
+
+config RTT_LITE_TRACE_THREAD_INFO
+	bool "Trace thread name and stack information"
+	default y
+	select THREAD_STACK_INFO
+	help
+	  Put name and stack information of each thread in traces. Thread names
+	  are enabled in kernel only if THREAD_NAME is set.
+
+config RTT_LITE_TRACE_FAST_OVERFLOW_CHECK
+	bool "Fast buffer overflow check"
+	help
+	  Do fast overflow detection. It will slightly impact on trace
+	  performance. It sends information needed to detect overflow once per
+	  size of RTT buffer and before entering idle. If none of this happened
+	  between overrun start and end of trace capturing then overflow will
+	  not be detected. With this option set you have to capture traces
+	  a little longer, enough to make sure that all overflows were detected.
+
+config RTT_LITE_TRACE_BUFFER_STATS
+	bool "Report peak buffer usage"
+	depends on !RTT_LITE_TRACE_FAST_OVERFLOW_CHECK
+	help
+	  Report peak RTT buffer usage.
+
+config RTT_LITE_TRACE_PRINTF_MAX_ARGS
+	bool "Maximum number of arguments in formated output"
+	range 1 255
+	default 7
+	help
+	  Set maximum number of arguments that rtt_lite_trace_printf can take.
+
+config RTT_LITE_TRACE_RTT_CHANNEL
+	int "RTT channel number"
+	range 1 1 if SEGGER_RTT_MAX_NUM_UP_BUFFERS <= 2
+	range 1 2 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 3
+	range 1 3 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 4
+	range 1 4 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 5
+	range 1 5 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 6
+	range 1 6 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 7
+	range 1 7 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 8
+	default 1 if SEGGER_RTT_MAX_NUM_UP_BUFFERS <= 2
+	default 2
+	help
+	  RTT channel that will be used to send tracing information. Host side
+	  application will not relay on this number, but it will search channel
+	  based on its name. The value must be less than
+	  SEGGER_RTT_MAX_NUM_UP_BUFFERS.
+
+choice RTT_LITE_TRACE_TIMER
+	prompt "Use nRF H/W timer"
+	default RTT_LITE_TRACE_TIMER1
+	help
+	  nRF H/W timer instance for fast and high resolution event time stamps.
+
+config RTT_LITE_TRACE_TIMER0
+	select NRFX_TIMER0
+	bool "TIMER0"
+
+config RTT_LITE_TRACE_TIMER1
+	select NRFX_TIMER1
+	bool "TIMER1"
+
+config RTT_LITE_TRACE_TIMER2
+	select NRFX_TIMER2
+	bool "TIMER2"
+
+config RTT_LITE_TRACE_TIMER3
+	select NRFX_TIMER3
+	bool "TIMER3"
+
+config RTT_LITE_TRACE_TIMER4
+	select NRFX_TIMER4
+	bool "TIMER4"
+
+endchoice
+
+choice RTT_LITE_TRACE_BUFFER_SIZE
+	prompt "RTT buffer size"
+	default RTT_LITE_TRACE_BUFFER_SIZE_2KB
+	help
+	  Size of the RTT buffer to transfer events.
+
+config RTT_LITE_TRACE_BUFFER_SIZE_512B
+	bool "512B 64 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_1KB
+	bool "1KB, 128 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_2KB
+	bool "2KB, 256 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_4KB
+	bool "4KB, 512 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_8KB
+	bool "8KB, 1024 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_16KB
+	bool "16KB, 2048 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_32KB
+	bool "32KB, 4096 events"
+
+config RTT_LITE_TRACE_BUFFER_SIZE_64KB
+	bool "64KB, 8192 events"
+
+endchoice
+
+config TRACING_CUSTOM_INCLUDE
+	string
+	default "debug/rtt_lite_trace.h"
+
+endif # RTT_LITE_TRACE

@@ -6,3 +6,4 @@
 
 rsource "ppi_trace/Kconfig"
 rsource "cpu_load/Kconfig"
+rsource "rtt_lite_trace/Kconfig"

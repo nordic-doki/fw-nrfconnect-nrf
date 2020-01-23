@@ -7,3 +7,4 @@
 
 add_subdirectory_ifdef(CONFIG_PPI_TRACE		ppi_trace)
 add_subdirectory_ifdef(CONFIG_CPU_LOAD		cpu_load)
+add_subdirectory_ifdef(CONFIG_RTT_LITE_TRACE	rtt_lite_trace)
