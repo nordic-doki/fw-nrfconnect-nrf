@@ -12,30 +12,22 @@
 
 
 /*
- * Events with 16-bit additional parameter.
- * Bit format:
- *     0000 0000 eeee eeee pppp pppp pppp pppp
- *     e - event numer
- *     p - additional parameter
-*/
-#define EV_BUFFER_CYCLE 0x00010000
-#define EV_THREAD_PRIORITY 0x00020000
-#define EV_THREAD_INFO_BEGIN 0x00030000
-#define EV_THREAD_INFO_NEXT 0x00040000
-#define EV_THREAD_INFO_END 0x00050000
-#define EV_FORMAT 0x00060000
-
-/*
  * Events with 24-bit additional parameter.
- * Bid formad:
+ * Bit format:
  *     0000 eeee pppp pppp pppp pppp pppp pppp
  *     e - event numer
  *     p - additional parameter
 */
-#define EV_BUFFER_BEGIN 0x01000000
-#define EV_BUFFER_NEXT 0x02000000
-#define EV_BUFFER_END 0x03000000
-#define EV_BUFFER_BEGIN_END 0x04000000
+#define EV_BUFFER_CYCLE 0x01000000
+#define EV_THREAD_PRIORITY 0x02000000
+#define EV_THREAD_INFO_BEGIN 0x03000000
+#define EV_THREAD_INFO_NEXT 0x04000000
+#define EV_THREAD_INFO_END 0x05000000
+#define EV_FORMAT 0x06000000
+#define EV_BUFFER_BEGIN 0x07000000
+#define EV_BUFFER_NEXT 0x08000000
+#define EV_BUFFER_END 0x09000000
+#define EV_BUFFER_BEGIN_END 0x0A000000
 
 /*
  * Events with 24-bit time stamp.
@@ -59,10 +51,7 @@
 #define EV_ISR_EXIT 0x1D000000
 #define EV_PRINTF 0x1E000000
 #define EV_PRINT 0x1F000000
-#define EV_MARK_START 0x20000000
-#define EV_MARK 0x21000000
-#define EV_MARK_STOP 0x22000000
-#define EV_RES_NAME 0x23000000
+#define EV_RES_NAME 0x20000000
 
 /*
  * Events with 24-bit time stamp and 7-bit ISR number.
@@ -231,23 +220,29 @@ static void send_thread_info(k_tid_t thread)
 	u32_t start = thread->stack_info.start;
 	const u8_t *name = (const u8_t *)k_thread_name_get(thread);
 
-	send_timeless(EV_THREAD_INFO_BEGIN | (size & 0xFFFF), (u32_t)thread);
-	send_timeless(EV_THREAD_INFO_NEXT | (size >> 16), (u32_t)thread);
-	send_timeless(EV_THREAD_INFO_NEXT | (start & 0xFFFF), (u32_t)thread);
+	send_timeless(EV_THREAD_INFO_BEGIN | (size & 0xFFFFFF), (u32_t)thread);
+	send_timeless(EV_THREAD_INFO_NEXT | (start & 0xFFFFFF), (u32_t)thread);
 	if (name != NULL && name[0] != 0) {
-		u32_t pair;
-		send_timeless(EV_THREAD_INFO_NEXT | (start >> 16), (u32_t)thread);
-		do {
-			pair = (u32_t)name[0] | ((u32_t)name[1] << 8);
-			if (name[1] == 0 || name[2] == 0) {
-				break;
-			}
-			send_timeless(EV_THREAD_INFO_NEXT | pair, (u32_t)thread);
+		u32_t chars; // TODO: fix below code - it is wrong!!!
+		send_timeless(EV_THREAD_INFO_NEXT | (start >> 24) | ((u32_t)name[0] << 8) | ((u32_t)name[1] << 16), (u32_t)thread);
+		if (name[1] != 0 && name[2] != 0) {
 			name += 2;
-		} while (true);
-		send_timeless(EV_THREAD_INFO_END | pair, (u32_t)thread);
+			do {
+				chars = ((u32_t)name[0] << 8) | ((u32_t)name[1] << 16);
+				if (name[1] == 0 || name[2] == 0) {
+					break;
+				}
+				chars |= (u32_t)name[2] << 16;
+				if (name[3] == 0) {
+					break;
+				}
+				send_timeless(EV_THREAD_INFO_NEXT | chars, (u32_t)thread);
+				name += 3;
+			} while (true);
+		}
+		send_timeless(EV_THREAD_INFO_END | chars, (u32_t)thread);
 	} else {
-		send_timeless(EV_THREAD_INFO_END | (start >> 16), (u32_t)thread);
+		send_timeless(EV_THREAD_INFO_END | (start >> 24), (u32_t)thread);
 	}
 }
 
@@ -425,7 +420,7 @@ static void send_buffers(struct buffer_context *buf, const void *data,
 		src += left;
 		if (buf->used == 7)
 		{
-			send_event_inner(buf->data[1], buf->data[0], 0, true);
+			send_timeless(buf->data[1], buf->data[0]);
 			buf->used = 0;
 			buf->data[1] &= 0x00FFFFFF;
 			buf->data[1] |= EV_BUFFER_NEXT;
@@ -443,7 +438,7 @@ static void done_buffers(struct buffer_context *buf)
 	} else {
 		buf->data[1] |= EV_BUFFER_END;
 	}
-	send_event_inner(buf->data[1], buf->data[0], 0, true);
+	send_timeless(buf->data[1], buf->data[0]);
 	buf->used = 0;
 	buf->data[1] = EV_BUFFER_BEGIN;
 }
@@ -524,7 +519,7 @@ static void prepare_format(struct rtt_lite_trace_format *format)
 	
 	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
 		struct buffer_context buf = INIT_BUFFER_CONTEXT;
-		rtt_lite_trace_event_timeless(EV_FORMAT, format->id, 0);
+		send_timeless(EV_FORMAT, format->id);
 		send_buffers(&buf, format->text, strlen(format->text) + 1);
 		send_buffers(&buf, format->args, strlen(format->args) + 1);
 		done_buffers(&buf);
@@ -599,36 +594,6 @@ void rtt_lite_trace_event(u32_t event, u32_t param)
 	send_event(event, param);
 }
 
-void rtt_lite_trace_event_timeless(u32_t event, u32_t param32, u16_t param16)
-{
-	send_timeless(event | (u32_t)param16, param32);
-}
-
-void rtt_lite_trace_mark_start(u32_t mark_id)
-{
-	rtt_lite_trace_event(EV_MARK_START, mark_id);
-}
-
-void rtt_lite_trace_mark(u32_t mark_id)
-{
-	rtt_lite_trace_event(EV_MARK, mark_id);
-}
-
-void rtt_lite_trace_mark_stop(u32_t mark_id)
-{
-	rtt_lite_trace_event(EV_MARK_STOP, mark_id);
-}
-
-void rtt_lite_trace_call(u32_t event)
-{
-	rtt_lite_trace_event(event, 0);
-}
-
-void rtt_lite_trace_call_1(u32_t event, u32_t arg1)
-{
-	rtt_lite_trace_event(event, arg1);
-}
-
 void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 {
 	u32_t i;
@@ -647,7 +612,7 @@ void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 void rtt_lite_trace_name(u32_t resource_id, const char* name)
 {
 	struct buffer_context buf = INIT_BUFFER_CONTEXT;
-	rtt_lite_trace_event_timeless(EV_RES_NAME, resource_id, 0);
+	send_timeless(EV_RES_NAME, resource_id);
 	send_buffers(&buf, name, strlen(name) + 1);
 	done_buffers(&buf);
 }

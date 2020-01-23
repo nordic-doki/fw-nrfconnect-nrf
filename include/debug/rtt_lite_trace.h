@@ -10,12 +10,13 @@
 #include <kernel_structs.h>
 #include <init.h>
 
-#define RTT_LITE_TRACE_USER_EVENT_FIRST 0x30000000
-#define RTT_LITE_TRACE_USER_EVENT_STEP 0x01000000
-#define RTT_LITE_TRACE_USER_EVENT_LAST 0x6F000000
-#define RTT_LITE_TRACE_USER_TIMELESS_EVENT_FIRST 0x00100000
-#define RTT_LITE_TRACE_USER_TIMELESS_EVENT_STEP 0x00010000
-#define RTT_LITE_TRACE_USER_TIMELESS_EVENT_LAST 0x007F0000
+#define RTT_LITE_TRACE_EV_MARK_START 0x21000000
+#define RTT_LITE_TRACE_EV_MARK 0x22000000
+#define RTT_LITE_TRACE_EV_MARK_STOP 0x23000000
+
+#define RTT_LITE_TRACE_EV_USER_FIRST 0x24000000
+#define RTT_LITE_TRACE_EV_USER_STEP 0x01000000
+#define RTT_LITE_TRACE_EV_USER_LAST 0x6F000000
 
 #define RTT_LITE_TRACE_USER_EVENT(id) \
 		((id) * RTT_LITE_TRACE_USER_EVENT_STEP \
@@ -59,21 +60,20 @@ struct rtt_lite_trace_format
 	u8_t args[CONFIG_RTT_LITE_TRACE_PRINTF_MAX_ARGS + 1];
 };
 
+u32_t rtt_lite_trace_time();
+
 void rtt_lite_trace_event(u32_t event, u32_t param);
-void rtt_lite_trace_event_timeless(u32_t event, u32_t param32, u16_t param16);
+
 void rtt_lite_trace_print(u32_t level, const char *text);
 void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...);
 
-u32_t rtt_lite_trace_time();
+static inline void rtt_lite_trace_mark_start(u32_t mark_id);
+static inline void rtt_lite_trace_mark(u32_t mark_id);
+static inline void rtt_lite_trace_mark_stop(u32_t mark_id);
 
-void rtt_lite_trace_mark_start(u32_t mark_id);
-void rtt_lite_trace_mark(u32_t mark_id);
-void rtt_lite_trace_mark_stop(u32_t mark_id);
-
-void rtt_lite_trace_call(u32_t event);
-void rtt_lite_trace_call_1(u32_t event, u32_t arg1);
+static inline void rtt_lite_trace_call(u32_t event);
+static inline void rtt_lite_trace_call_1(u32_t event, u32_t arg1);
 void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...);
-
 void rtt_lite_trace_name(u32_t resource_id, const char* name);
 
 void sys_trace_thread_switched_in(void);
@@ -107,5 +107,30 @@ void sys_trace_end_call(u32_t id);
 // Trace macros that are actually never called by the Zephyr kernel
 #define sys_trace_isr_exit_to_scheduler() 
 #define sys_trace_thread_info(thread)
+
+static inline void rtt_lite_trace_mark_start(u32_t mark_id)
+{
+	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK_START, mark_id);
+}
+
+static inline void rtt_lite_trace_mark(u32_t mark_id)
+{
+	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK, mark_id);
+}
+
+static inline void rtt_lite_trace_mark_stop(u32_t mark_id)
+{
+	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK_STOP, mark_id);
+}
+
+static inline void rtt_lite_trace_call(u32_t event)
+{
+	rtt_lite_trace_event(event, 0);
+}
+
+static inline void rtt_lite_trace_call_1(u32_t event, u32_t arg1)
+{
+	rtt_lite_trace_event(event, arg1);
+}
 
 #endif /* _RTT_LIGHT_TRACE_H */
