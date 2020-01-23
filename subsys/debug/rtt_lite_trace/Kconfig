@@ -59,11 +59,19 @@ config RTT_LITE_TRACE_BUFFER_STATS
 	  Report peak RTT buffer usage.
 
 config RTT_LITE_TRACE_PRINTF_MAX_ARGS
-	bool "Maximum number of arguments in formated output"
+	int "Maximum number of arguments in formated output"
 	range 1 255
-	default 7
+	default 6
 	help
 	  Set maximum number of arguments that rtt_lite_trace_printf can take.
+
+config RTT_LITE_TRACE_FORMAT_ONCE
+	bool "Send format string only once"
+	default y
+	help
+	  Send format string only once before first use. This reduces trace
+	  size and time overhead, but if capturing is not started on system
+	  reset then some strings may be incorrectly formated.
 
 config RTT_LITE_TRACE_RTT_CHANNEL
 	int "RTT channel number"

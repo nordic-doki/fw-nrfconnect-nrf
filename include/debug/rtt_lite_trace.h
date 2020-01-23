@@ -10,9 +10,9 @@
 #include <kernel_structs.h>
 #include <init.h>
 
-#define RTT_LITE_TRACE_USER_EVENT_FIRST 0x10000000
+#define RTT_LITE_TRACE_USER_EVENT_FIRST 0x30000000
 #define RTT_LITE_TRACE_USER_EVENT_STEP 0x01000000
-#define RTT_LITE_TRACE_USER_EVENT_LAST 0x7F000000
+#define RTT_LITE_TRACE_USER_EVENT_LAST 0x6F000000
 #define RTT_LITE_TRACE_USER_TIMELESS_EVENT_FIRST 0x00100000
 #define RTT_LITE_TRACE_USER_TIMELESS_EVENT_STEP 0x00010000
 #define RTT_LITE_TRACE_USER_TIMELESS_EVENT_LAST 0x007F0000
@@ -24,44 +24,47 @@
 		((id) * RTT_LITE_TRACE_USER_TIMELESS_EVENT_STEP \
 		+ RTT_LITE_TRACE_USER_TIMELESS_EVENT_FIRST)
 
-#define RTT_LITE_TRACE_LOG 0
-#define RTT_LITE_TRACE_WARNING 1
-#define RTT_LITE_TRACE_ERROR 2
+#define RTT_LITE_TRACE_LEVEL_LOG 0
+#define RTT_LITE_TRACE_LEVEL_WARNING 1
+#define RTT_LITE_TRACE_LEVEL_ERROR 2
 
-#define RTT_LITE_TRACE_FORMAT_INIT(format_string) { \
-		.text = (format_string), .index = 0, .args = { 0 } }
+#define RTT_LITE_TRACE_FORMAT_INIT(_level, format_string) { \
+	.text = (format_string), .id = 0, .level = (_level) .args = { 0 } }
 
 #define RTT_LITE_TRACE_PRINTF(level, format_string, ...) \
 	do { \
 		static struct rtt_lite_trace_format _lite_trace_fmt = \
-			RTT_LITE_TRACE_FORMAT_INIT(format_string); \
-		rtt_lite_trace_printf(level, &_lite_trace_fmt, ##__VA_ARGS__); \
+			RTT_LITE_TRACE_FORMAT_INIT(level, format_string); \
+		rtt_lite_trace_printf(&_lite_trace_fmt, ##__VA_ARGS__); \
 	} while (0);
 
 #define RTT_LITE_TRACE_LOGF(format, ...) \
-	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_LOG, format, ##__VA_ARGS__)
+	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_LEVEL_LOG, format, ##__VA_ARGS__)
 #define RTT_LITE_TRACE_WARNF(format, ...) \
-	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_WARNING, format, ##__VA_ARGS__)
+	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_LEVEL_WARNING, format, ##__VA_ARGS__)
 #define RTT_LITE_TRACE_ERRF(format, ...) \
-	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_ERROR, format, ##__VA_ARGS__)
+	RTT_LITE_TRACE_PRINTF(RTT_LITE_TRACE_LEVEL_ERROR, format, ##__VA_ARGS__)
 #define RTT_LITE_TRACE_LOG(text)) \
-	rtt_lite_trace_print(RTT_LITE_TRACE_LOG, (text))
+	rtt_lite_trace_print(RTT_LITE_TRACE_LEVEL_LOG, (text))
 #define RTT_LITE_TRACE_WARN(text)) \
-	rtt_lite_trace_print(RTT_LITE_TRACE_WARNING, (text))
+	rtt_lite_trace_print(RTT_LITE_TRACE_LEVEL_WARNING, (text))
 #define RTT_LITE_TRACE_ERR(text)) \
-	rtt_lite_trace_print(RTT_LITE_TRACE_ERROR, (text))
+	rtt_lite_trace_print(RTT_LITE_TRACE_LEVEL_ERROR, (text))
 
 struct rtt_lite_trace_format
 {
 	const char* text;
-	u32_t index;
+	u32_t id;
+	u8_t level;
 	u8_t args[CONFIG_RTT_LITE_TRACE_PRINTF_MAX_ARGS + 1];
 };
 
 void rtt_lite_trace_event(u32_t event, u32_t param);
 void rtt_lite_trace_event_timeless(u32_t event, u32_t param32, u16_t param16);
 void rtt_lite_trace_print(u32_t level, const char *text);
-void rtt_lite_trace_printf(u32_t level, struct rtt_lite_trace_format *format, ...);
+void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...);
+
+u32_t rtt_lite_trace_time();
 
 void rtt_lite_trace_mark_start(u32_t mark_id);
 void rtt_lite_trace_mark(u32_t mark_id);
@@ -69,9 +72,7 @@ void rtt_lite_trace_mark_stop(u32_t mark_id);
 
 void rtt_lite_trace_call(u32_t event);
 void rtt_lite_trace_call_1(u32_t event, u32_t arg1);
-void rtt_lite_trace_call_v(u32_t event, u32_t num_args, ...);
-void rtt_lite_trace_return_void(u32_t event);
-void rtt_lite_trace_return(u32_t event, u32_t result);
+void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...);
 
 void rtt_lite_trace_name(u32_t resource_id, const char* name);
 
