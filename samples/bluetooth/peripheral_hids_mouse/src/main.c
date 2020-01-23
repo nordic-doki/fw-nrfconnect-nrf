@@ -28,6 +28,8 @@
 #include <bluetooth/services/dis.h>
 #include <dk_buttons_and_leds.h>
 
+#include "debug/tracing.h"
+
 #define DEVICE_NAME     CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
@@ -127,6 +129,23 @@ K_MSGQ_DEFINE(mitm_queue,
 	      sizeof(struct pairing_data_mitm),
 	      CONFIG_BT_GATT_HIDS_MAX_CLIENT_COUNT,
 	      4);
+
+
+static void cpuStatsMarker(const char* text)
+{
+    struct cpu_stats stats;
+	int key = irq_lock();
+    cpu_stats_get_ns(&stats);
+    cpu_stats_reset_counters();
+	irq_unlock(key);
+    uint64_t percent = (stats.non_idle + stats.sched) * (uint64_t)1000 / (stats.non_idle + stats.sched + stats.idle);
+    printk("~ %10u %10u %10u  %3u.%u %s\n", (uint32_t)((stats.non_idle + (uint64_t)500) / (uint64_t)1000),
+        (uint32_t)((stats.sched + (uint64_t)500) / (uint64_t)1000),
+        (uint32_t)((stats.idle + (uint64_t)500) / (uint64_t)1000),
+        (uint32_t)percent / 10,
+        (uint32_t)percent % 10,
+        text);
+}
 
 #if CONFIG_BT_DIRECTED_ADVERTISING
 static void bond_find(const struct bt_bond_info *info, void *user_data)
@@ -261,6 +280,8 @@ static void connected(struct bt_conn *conn, u8_t err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
 
+    cpuStatsMarker("CONNECTED");
+
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	if (err) {
@@ -295,6 +316,8 @@ static void disconnected(struct bt_conn *conn, u8_t reason)
 	int err;
 	char addr[BT_ADDR_LE_STR_LEN];
 
+    cpuStatsMarker("DISCONNECTED");
+
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	k_delayed_work_cancel(&hids_work);
 
@@ -322,6 +345,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 			     enum bt_security_err err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
+
+    cpuStatsMarker("SEC_CHANGED");
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
@@ -499,6 +524,8 @@ static void hid_init(void)
 
 static void mouse_movement_send(s16_t x_delta, s16_t y_delta)
 {
+    cpuStatsMarker("MOVE");
+
 	for (size_t i = 0; i < CONFIG_BT_GATT_HIDS_MAX_CLIENT_COUNT; i++) {
 
 		if (!conn_mode[i].conn) {
@@ -616,6 +643,8 @@ static void pairing_complete(struct bt_conn *conn, bool bonded)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
 
+    cpuStatsMarker("PAIRING");
+
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Pairing completed: %s, bonded: %d\n", addr, bonded);
@@ -625,6 +654,8 @@ static void pairing_complete(struct bt_conn *conn, bool bonded)
 static void pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
+
+    cpuStatsMarker("PAIRING FAILED");
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
@@ -759,6 +790,8 @@ void main(void)
 {
 	int err;
 
+    cpuStatsMarker("START");
+
 	printk("Starting Bluetooth Peripheral HIDS mouse example\n");
 
 	bt_conn_cb_register(&conn_callbacks);
@@ -788,6 +821,8 @@ void main(void)
 	advertising_start();
 
 	configure_buttons();
+
+    cpuStatsMarker("LOOP");
 
 	while (1) {
 		k_sleep(MSEC_PER_SEC);
