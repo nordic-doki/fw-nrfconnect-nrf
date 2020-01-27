@@ -150,11 +150,16 @@ static ALWAYS_INLINE u32_t get_time(void)
 static ALWAYS_INLINE void send_event_inner(u32_t event, u32_t param, u32_t time,
 		bool with_param)
 {
-	int key = irq_lock();
+	u32_t index;
+	u32_t left;
+	u32_t cnt;
+	int key;
 
 	event = event | time;
 
-	u32_t index = RTT_BUFFER_INDEX;
+	key = irq_lock();
+
+	index = RTT_BUFFER_INDEX;
 
 	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FAST_OVERFLOW_CHECK)) {
 
@@ -170,13 +175,12 @@ static ALWAYS_INLINE void send_event_inner(u32_t event, u32_t param, u32_t time,
 
 	} else {
 
-		u32_t left = (RTT_BUFFER_READ_INDEX - index - 1)
+		left = (RTT_BUFFER_READ_INDEX - index - 1)
 				& (RTT_BUFFER_INDEX_MASK & ~7);
 
 		if (left <= 8) {
 			if (left == 0) {
-				u32_t cnt = (index - 4) & RTT_BUFFER_INDEX_MASK;
-
+				cnt = (index - 4) & RTT_BUFFER_INDEX_MASK;
 				RTT_BUFFER_U32(cnt)++;
 				goto unlock_and_return;
 			}
@@ -458,11 +462,11 @@ static u8_t parse_format_arg(const char **pp)
 	};
 	const char *p = *pp;
 	int long_count = 0;
+	u8_t type;
 	u8_t result = FORMAT_ARG_END;
 
 	while (*p) {
-		u8_t type = (*p < ' ' || *p > '~') ? 0 : table[*p - ' '];
-
+		type = (*p < ' ' || *p > '~') ? 0 : table[*p - ' '];
 		p++;
 		if (type < 7) {
 			result = type;
@@ -505,7 +509,6 @@ static void parse_format_args(struct rtt_lite_trace_format *format)
 static void prepare_format(struct rtt_lite_trace_format *format)
 {
 	static volatile u32_t last_format_id; /* zero-initialied after reset */
-	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 	int key;
 
 	parse_format_args(format);
@@ -522,6 +525,8 @@ static void prepare_format(struct rtt_lite_trace_format *format)
 	format->id |= ((u32_t)format->level << 24);
 
 	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
+		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
+
 		send_timeless(EV_FORMAT, format->id);
 		send_buffers(&buf, format->text, strlen(format->text) + 1);
 		send_buffers(&buf, format->args, strlen(format->args) + 1);
