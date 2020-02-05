@@ -33,7 +33,8 @@
 
 /** @brief Event reporting change of thread priority.
  *
- * @param additional Thread priority
+ * @param additional Thread priority. Additionally bit 23 is set if thread is
+ *         an idle thread.
  * @param param      Thread id.
  */
 #define EV_THREAD_PRIORITY 0x02000000
@@ -51,7 +52,8 @@
  * |         | information.                                       |
  * +---------+----------------------------------------------------+
  * | 4       | Stack base address or zero if system does not      |
- * |         | provide such information.                          |
+ * |         | provide such information. Additionally bit 0 is    |
+ * |         | set if thread is an idle thread.                   |
  * +---------+----------------------------------------------------+
  * | 1       | Thread priority.                                   |
  * +---------+----------------------------------------------------+
@@ -437,16 +439,21 @@ static void send_thread_info(k_tid_t thread)
 	u32_t param;
 	u32_t size = 0;
 	u32_t start = 0;
-	const u8_t *name = (const u8_t *)k_thread_name_get(thread);
-	u8_t prio = (u8_t)thread->base.prio;
+	const u8_t *name;
+	u8_t prio;
+	u32_t is_idle;
 
 #if defined(CONFIG_THREAD_STACK_INFO)
 	size = thread->stack_info.size;
 	start = thread->stack_info.start;
 #endif /* CONFIG_THREAD_STACK_INFO */
+	name = (const u8_t *)k_thread_name_get(thread);
+	prio = (u8_t)thread->base.prio;
+	is_idle = z_is_idle_thread_object(thread) ? 1 : 0;
 
 	send_timeless(EV_THREAD_INFO_BEGIN | (size & 0xFFFFFF), (u32_t)thread);
-	send_timeless(EV_THREAD_INFO_NEXT | (start & 0xFFFFFF), (u32_t)thread);
+	send_timeless(EV_THREAD_INFO_NEXT | (start & 0xFFFFFE) | is_idle,
+		(u32_t)thread);
 	param = (start >> 24) | ((u32_t)prio << 8);
 	if (IS_ENABLED(CONFIG_THREAD_NAME) && name != NULL && name[0] != 0) {
 		param |= (u32_t)name[0] << 16;
@@ -519,8 +526,8 @@ static void initialize(void)
 
 		RTT_BUFFER_U32(RTT_BUFFER_BYTES + 8) = EV_SYNC_FIRST | SYNC_ADDITIONAL;
 		RTT_BUFFER_U32(RTT_BUFFER_BYTES + 12) = SYNC_PARAM;
-		send_short(EV_SYSTEM_RESET);
 		send_timeless(EV_SYNC_FIRST | SYNC_ADDITIONAL, SYNC_PARAM);
+		send_short(EV_SYSTEM_RESET);
 
 		initialized = true;
 	}
@@ -528,13 +535,7 @@ static void initialize(void)
 
 void sys_trace_thread_switched_in(void)
 {
-	k_tid_t thread = k_current_get();
-
-	if (z_is_idle_thread_object(thread)) {
-		send_event(EV_IDLE, RTT_BUFFER_U32(RTT_BUFFER_BYTES + 4));
-	} else {
-		send_event(EV_THREAD_START, (u32_t)thread);
-	}
+	send_event(EV_THREAD_START, (u32_t)k_current_get());
 }
 
 void sys_trace_thread_switched_out(void)
@@ -568,8 +569,8 @@ void sys_trace_idle(void)
 void sys_trace_thread_priority_set(k_tid_t thread)
 {
 	u8_t prio = (u8_t)thread->base.prio;
-
-	send_timeless(EV_THREAD_PRIORITY | (u32_t)prio, (u32_t)thread);
+	u32_t idle = z_is_idle_thread_object(thread) ? 0x00800000 : 0;
+	send_timeless(EV_THREAD_PRIORITY | (u32_t)prio | idle, (u32_t)thread);
 }
 
 void sys_trace_thread_create(k_tid_t thread)
