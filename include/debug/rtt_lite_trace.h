@@ -10,20 +10,14 @@
 #include <kernel_structs.h>
 #include <init.h>
 
-#define RTT_LITE_TRACE_EV_MARK_START 0x21000000
-#define RTT_LITE_TRACE_EV_MARK 0x22000000
-#define RTT_LITE_TRACE_EV_MARK_STOP 0x23000000
+#define _RTT_LITE_TRACE_EV_MARK_START 0x20000000
+#define _RTT_LITE_TRACE_EV_MARK 0x21000000
+#define _RTT_LITE_TRACE_EV_MARK_STOP 0x22000000
 
-#define RTT_LITE_TRACE_EV_USER_FIRST 0x24000000
-#define RTT_LITE_TRACE_EV_USER_STEP 0x01000000
-#define RTT_LITE_TRACE_EV_USER_LAST 0x6F000000
+#define _RTT_LITE_TRACE_EV_USER_FIRST 0x23000000
+#define _RTT_LITE_TRACE_EV_USER_LAST 0x77000000
 
-#define RTT_LITE_TRACE_USER_EVENT(id) \
-		((id) * RTT_LITE_TRACE_USER_EVENT_STEP \
-		+ RTT_LITE_TRACE_USER_EVENT_FIRST)
-#define RTT_LITE_TRACE_USER_TIMELESS_EVENT(id) \
-		((id) * RTT_LITE_TRACE_USER_TIMELESS_EVENT_STEP \
-		+ RTT_LITE_TRACE_USER_TIMELESS_EVENT_FIRST)
+#define RTT_LITE_TRACE_USER_EVENT(id) ((id) + _RTT_LITE_TRACE_EV_USER_FIRST)
 
 #define RTT_LITE_TRACE_LEVEL_LOG 0
 #define RTT_LITE_TRACE_LEVEL_WARN 1
@@ -109,17 +103,17 @@ void sys_trace_end_call(u32_t id);
 
 static inline void rtt_lite_trace_mark_start(u32_t mark_id)
 {
-	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK_START, mark_id);
+	rtt_lite_trace_event(_RTT_LITE_TRACE_EV_MARK_START, mark_id);
 }
 
 static inline void rtt_lite_trace_mark(u32_t mark_id)
 {
-	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK, mark_id);
+	rtt_lite_trace_event(_RTT_LITE_TRACE_EV_MARK, mark_id);
 }
 
 static inline void rtt_lite_trace_mark_stop(u32_t mark_id)
 {
-	rtt_lite_trace_event(RTT_LITE_TRACE_EV_MARK_STOP, mark_id);
+	rtt_lite_trace_event(_RTT_LITE_TRACE_EV_MARK_STOP, mark_id);
 }
 
 static inline void rtt_lite_trace_call(u32_t event)
