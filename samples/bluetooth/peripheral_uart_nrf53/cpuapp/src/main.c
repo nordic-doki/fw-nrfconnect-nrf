@@ -22,7 +22,13 @@
 #include <init.h>
 
 #include "bt_ser.h"
-#include "rpmsg.h"
+#include "rpmsg.h" 
+
+#include "debug/tracing.h"
+
+#define DISABLE_UART
+#define DISABLE_BLINKY
+#define ENABLE_CPU_STATS
 
 #define STACKSIZE CONFIG_BT_GATT_NUS_THREAD_STACK_SIZE
 #define PRIORITY 7
@@ -38,6 +44,8 @@
 
 static K_SEM_DEFINE(ble_init_ok, 0, 2);
 
+#if !defined(DISABLE_UART)
+
 static struct device *uart;
 
 struct uart_data_t {
@@ -48,6 +56,34 @@ struct uart_data_t {
 
 static K_FIFO_DEFINE(fifo_uart_tx_data);
 static K_FIFO_DEFINE(fifo_uart_rx_data);
+
+#endif
+
+#if defined(ENABLE_CPU_STATS)
+
+static struct k_delayed_work cpu_marker_show;
+
+static void cpu_stats_marker(const char* text)
+{
+	struct cpu_stats stats;
+	cpu_stats_get_ns(&stats);
+	uint64_t ppm = (stats.non_idle + stats.sched) * (uint64_t)1000000 / (stats.non_idle + stats.sched + stats.idle);
+	printk("\n~ %10u %10u %10u  %3u.%03u %s\n", (uint32_t)((stats.non_idle + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)((stats.sched + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)((stats.idle + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)ppm / 1000,
+		(uint32_t)ppm % 1000,
+		text);
+	k_delayed_work_cancel(&cpu_marker_show);
+	cpu_stats_reset_counters();
+}
+
+static void show_delayed_cpu_stats(struct k_work *work)
+{
+	cpu_stats_marker("Delayed");
+}
+
+#endif
 
 static int bt_addr_le_to_str(const bt_addr_le_t *addr, char *str,
 			     size_t len)
@@ -76,6 +112,8 @@ static int bt_addr_le_to_str(const bt_addr_le_t *addr, char *str,
 			addr->a.val[5], addr->a.val[4], addr->a.val[3],
 			addr->a.val[2], addr->a.val[1], addr->a.val[0], type);
 }
+
+#if !defined(DISABLE_UART)
 
 static void uart_cb(struct device *uart)
 {
@@ -165,6 +203,8 @@ static int uart_init(void)
 	return 0;
 }
 
+#endif
+
 static void bt_connected(const bt_addr_le_t *addr, u8_t err)
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
@@ -194,6 +234,8 @@ static void bt_disconnected(const bt_addr_le_t *addr, u8_t reason)
 
 static void bt_received(const bt_addr_le_t *addr, const u8_t *data, size_t len)
 {
+#if !defined(DISABLE_UART)
+
 	char addr_str[BT_ADDR_LE_STR_LEN] = { 0 };
 
 	bt_addr_le_to_str(addr, addr_str, ARRAY_SIZE(addr_str));
@@ -234,6 +276,19 @@ static void bt_received(const bt_addr_le_t *addr, const u8_t *data, size_t len)
 
 	/* Start the UART transfer by enabling the TX ready interrupt */
 	uart_irq_tx_enable(uart);
+#else
+
+	static char buf[3] = " \r\n";
+	static char bit = 0;
+	buf[0] = ('@' + len) ^ bit;
+	bit ^= 32;
+	int err = bt_nus_transmit(buf, 3);
+	if (err) 
+	{
+		printk("bt_nus_transmit error: %d\n", err);
+	}
+
+#endif
 }
 
 static const struct bt_nus_cb bt_nus_callbacks = {
@@ -252,6 +307,24 @@ void error(void)
 	}
 }
 
+#if defined(ENABLE_CPU_STATS)
+
+static void button_changed(u32_t button_state, u32_t has_changed)
+{
+	u32_t buttons = button_state & has_changed;
+	if (buttons & DK_BTN3_MSK) {
+		cpu_stats_marker("Button + 60sec");
+		k_delayed_work_submit(&cpu_marker_show, K_SECONDS(60));
+		cpu_stats_reset_counters();
+	} else if (buttons & DK_BTN4_MSK) {
+		cpu_stats_marker("Button + 20sec");
+		k_delayed_work_submit(&cpu_marker_show, K_SECONDS(20));
+		cpu_stats_reset_counters();
+	}
+}
+
+#endif
+
 static void configure_gpio(void)
 {
 	int err;
@@ -260,11 +333,24 @@ static void configure_gpio(void)
 	if (err) {
 		printk("Cannot init LEDs (err: %d)\n", err);
 	}
+
+#if defined(ENABLE_CPU_STATS)
+
+	err = dk_buttons_init(button_changed);
+	if (err) {
+		printk("Cannot init buttons (err: %d)\n", err);
+	}
+
+	k_delayed_work_init(&cpu_marker_show, show_delayed_cpu_stats);
+
+#endif
 }
 
 static void led_blink_thread(void)
 {
+#if !defined(DISABLE_BLINKY)
 	int blink_status = 0;
+#endif
 	int err = 0;
 
 	ipc_register_rx_callback(bt_nus_rx_parse);
@@ -273,10 +359,12 @@ static void led_blink_thread(void)
 		printk("Rpmsg init error %d\n", err);
 	}
 
+#if !defined(DISABLE_UART)
 	err = uart_init();
 	if (err) {
 		error();
 	}
+#endif
 
 	configure_gpio();
 
@@ -292,11 +380,15 @@ static void led_blink_thread(void)
 
 	printk("Starting Nordic UART service example[APP CORE]\n");
 
+#if !defined(DISABLE_BLINKY)
 	for (;;) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
 		k_sleep(RUN_LED_BLINK_INTERVAL);
 	}
+#endif
 }
+
+#if !defined(DISABLE_UART)
 
 void ble_write_thread(void)
 {
@@ -316,8 +408,10 @@ void ble_write_thread(void)
 	}
 }
 
-K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
+K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);
 
-K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
+#endif
+
+K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);

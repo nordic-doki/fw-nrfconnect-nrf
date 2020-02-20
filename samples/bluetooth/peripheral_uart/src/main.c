@@ -27,6 +27,11 @@
 #include <settings/settings.h>
 
 #include <stdio.h>
+#include "debug/tracing.h"
+
+#define DISABLE_UART
+#define DISABLE_BLINKY
+#define ENABLE_CPU_STATS
 
 #define STACKSIZE               CONFIG_BT_GATT_NUS_THREAD_STACK_SIZE
 #define PRIORITY                7
@@ -49,6 +54,8 @@ static K_SEM_DEFINE(ble_init_ok, 0, 2);
 static struct bt_conn *current_conn;
 static struct bt_conn *auth_conn;
 
+#if !defined(DISABLE_UART)
+
 static struct device *uart;
 static bool rx_disabled;
 
@@ -61,6 +68,8 @@ struct uart_data_t {
 static K_FIFO_DEFINE(fifo_uart_tx_data);
 static K_FIFO_DEFINE(fifo_uart_rx_data);
 
+#endif
+
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
@@ -69,6 +78,34 @@ static const struct bt_data ad[] = {
 static const struct bt_data sd[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, NUS_UUID_SERVICE),
 };
+
+#if defined(ENABLE_CPU_STATS)
+
+static struct k_delayed_work cpu_marker_show;
+
+static void cpu_stats_marker(const char* text)
+{
+	struct cpu_stats stats;
+	cpu_stats_get_ns(&stats);
+	uint64_t ppm = (stats.non_idle + stats.sched) * (uint64_t)1000000 / (stats.non_idle + stats.sched + stats.idle);
+	printk("\n~ %10u %10u %10u  %3u.%03u %s\n", (uint32_t)((stats.non_idle + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)((stats.sched + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)((stats.idle + (uint64_t)500) / (uint64_t)1000),
+		(uint32_t)ppm / 1000,
+		(uint32_t)ppm % 1000,
+		text);
+	k_delayed_work_cancel(&cpu_marker_show);
+	cpu_stats_reset_counters();
+}
+
+static void show_delayed_cpu_stats(struct k_work *work)
+{
+	cpu_stats_marker("Delayed");
+}
+
+#endif
+
+#if !defined(DISABLE_UART)
 
 static void uart_cb(struct device *uart)
 {
@@ -156,6 +193,8 @@ static int init_uart(void)
 
 	return 0;
 }
+
+#endif
 
 static void connected(struct bt_conn *conn, u8_t err)
 {
@@ -299,6 +338,7 @@ static struct bt_conn_auth_cb conn_auth_callbacks;
 static void bt_receive_cb(struct bt_conn *conn, const u8_t *const data,
 			  u16_t len)
 {
+#if !defined(DISABLE_UART)
 	char addr[BT_ADDR_LE_STR_LEN] = {0};
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr));
@@ -339,6 +379,19 @@ static void bt_receive_cb(struct bt_conn *conn, const u8_t *const data,
 
 	/* Start the UART transfer by enabling the TX ready interrupt */
 	uart_irq_tx_enable(uart);
+#else
+
+	static char buf[3] = " \r\n";
+	static char bit = 0;
+	buf[0] = ('@' + len) ^ bit;
+	bit ^= 32;
+	int err = bt_gatt_nus_send(NULL, buf, 3);
+	if (err) 
+	{
+		printk("bt_gatt_nus_send error: %d\n", err);
+	}
+
+#endif
 }
 
 static struct bt_gatt_nus_cb nus_cb = {
@@ -382,6 +435,20 @@ void button_changed(u32_t button_state, u32_t has_changed)
 			num_comp_reply(false);
 		}
 	}
+
+#if defined(ENABLE_CPU_STATS)
+
+	if (buttons & DK_BTN3_MSK) {
+		cpu_stats_marker("Button + 60sec");
+		k_delayed_work_submit(&cpu_marker_show, K_SECONDS(60));
+		cpu_stats_reset_counters();
+	} else if (buttons & DK_BTN4_MSK) {
+		cpu_stats_marker("Button + 20sec");
+		k_delayed_work_submit(&cpu_marker_show, K_SECONDS(20));
+		cpu_stats_reset_counters();
+	}
+
+#endif
 }
 
 static void configure_gpio(void)
@@ -397,19 +464,27 @@ static void configure_gpio(void)
 	if (err) {
 		printk("Cannot init LEDs (err: %d)\n", err);
 	}
+	
+#if defined(ENABLE_CPU_STATS)
+	k_delayed_work_init(&cpu_marker_show, show_delayed_cpu_stats);
+#endif
 }
 
 static void led_blink_thread(void)
 {
+#if !defined(DISABLE_BLINKY)
 	int    blink_status       = 0;
+#endif
 	int    err                = 0;
 
 	printk("Starting Nordic UART service example\n");
 
+#if !defined(DISABLE_UART)
 	err = init_uart();
 	if (err) {
 		error();
 	}
+#endif
 
 	configure_gpio();
 
@@ -443,11 +518,15 @@ static void led_blink_thread(void)
 		printk("Advertising failed to start (err %d)\n", err);
 	}
 
+#if !defined(DISABLE_BLINKY)
 	for (;;) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
 		k_sleep(RUN_LED_BLINK_INTERVAL);
 	}
+#endif
 }
+
+#if !defined(DISABLE_UART)
 
 void ble_write_thread(void)
 {
@@ -472,8 +551,10 @@ void ble_write_thread(void)
 	}
 }
 
-K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
+K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);
 
-K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
+#endif
+
+K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);
