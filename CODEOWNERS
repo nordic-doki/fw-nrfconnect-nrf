@@ -82,6 +82,8 @@ Kconfig*                                  @SebastianBoe
 /samples/mpsl/**/*.rst                    @b-gent
 /samples/nfc/                             @grochu
 /samples/nfc/**/README.rst                @b-gent
+/samples/nrf5340/empty_app_core/          @doki-nordic
+/samples/nrf5340/**/README.rst            @b-gent
 /samples/nrf9160/                         @rlubos @lemrey
 /samples/nrf9160/spm/                     @lemrey @hakonfam @ioannisg
 /samples/profiler/                        @pdunaj @pizi-nordic
