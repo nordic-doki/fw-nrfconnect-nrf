@@ -22,7 +22,7 @@
 #include <init.h>
 
 #include "bt_ser.h"
-#include "rpmsg.h"
+#include "rp_ll_api.h"
 
 #define STACKSIZE CONFIG_BT_GATT_NUS_THREAD_STACK_SIZE
 #define PRIORITY 7
@@ -294,7 +294,9 @@ static void led_blink_thread(void)
 
 	for (;;) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
-		k_sleep(RUN_LED_BLINK_INTERVAL);
+		k_sleep(333);
+		static int kk = 0;
+		printk("Step %d\n", kk++);
 	}
 }
 
@@ -316,8 +318,59 @@ void ble_write_thread(void)
 	}
 }
 
-K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
+/*K_THREAD_DEFINE(led_blink_thread_id, STACKSIZE, led_blink_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 		NULL, PRIORITY, 0, K_NO_WAIT);
+*/
+
+///////////////////////////////////////////////
+
+struct k_delayed_work dw;
+
+struct rp_ll_endpoint ep1;
+
+void send_later(struct k_work *work)
+{
+	printk("Sending...\n");
+	rp_ll_send(&ep1, (u8_t*)"abc", 3);
+	k_delayed_work_submit(&dw, K_MSEC(5000));
+	//k_sleep(1000);
+	//rp_ll_endpoint_uninit(&ep1);
+}
+
+
+void test_callback(struct rp_ll_endpoint *endpoint,
+	enum rp_ll_event_type event, const u8_t *buf, size_t length)
+{
+	printk("Event: %d, len: %d", event, length);
+}
+
+void rp_test()
+{
+
+	if (IS_ENABLED(CONFIG_RPMSG_MASTER)) {
+		printk("=== MASTER");
+	} else {
+		printk("=== SLAVE");
+	}
+
+	rp_ll_init();
+	
+	rp_ll_endpoint_init(&ep1, 0, test_callback, NULL);
+
+	k_delayed_work_init(&dw, send_later);
+
+	if (IS_ENABLED(CONFIG_RPMSG_MASTER))
+		k_delayed_work_submit(&dw, K_MSEC(1000));
+}
+
+int main()
+{
+	//k_sleep(K_MSEC(5000));
+
+	rp_test();
+	
+	return 0;
+}

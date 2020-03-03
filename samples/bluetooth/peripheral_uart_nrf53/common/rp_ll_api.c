@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2020 Nordic Semiconductor ASA
  *
@@ -21,31 +22,24 @@
 #include <metal/device.h>
 #include <metal/alloc.h>
 
-#include "rpmsg.h"
+#include "rp_ll_api.h"
 
 #include <logging/log.h>
-LOG_MODULE_REGISTER(rpmsg);
 
-/**@brief RPC structure
- *
- * Contains all used stuff to ensure stable and realiable communication
- */
-struct rpc_ctx {
-	/* Pointer to RX callback */
-	rx_callback rx_callback;
+#define CONFIG_RP_LL_API_LOG_LEVEL 10
 
-	/* RX data semaphore */
-	struct k_sem data_rx_sem;
+LOG_MODULE_REGISTER(rp_ll_api, CONFIG_RP_LL_API_LOG_LEVEL);
 
-	/* Endpoint semaphore */
-	struct k_sem ept_sem;
-};
+static struct k_sem ipm_event_sem;
 
 /* Stack size of stack area used by each thread */
 #define STACKSIZE 1024
 
 /* Scheduling priority used by each thread */
 #define PRIORITY 7
+
+/* Indicates that handshake was done by this endpoint */
+#define EP_FLAG_HANSHAKE_DONE 1
 
 /* Shared memory configuration */
 #define SHM_START_ADDR      (DT_IPC_SHM_BASE_ADDRESS + 0x400)
@@ -59,6 +53,7 @@ struct rpc_ctx {
 #define VRING_SIZE          16
 
 #define VDEV_STATUS_ADDR    DT_IPC_SHM_BASE_ADDRESS
+
 
 /* Handlers for TX and RX channels */
 /* TX handler */
@@ -92,14 +87,11 @@ static struct metal_device shm_device = {
 };
 
 static struct virtqueue *vq[2];
-static struct rpmsg_endpoint ep;
 
 /* Thread properties */
 static K_THREAD_STACK_DEFINE(rx_thread_stack, STACKSIZE);
 static struct k_thread rx_thread_data;
 
-/* Main context structure */
-static struct rpc_ctx rpc;
 
 static unsigned char virtio_get_status(struct virtio_device *vdev)
 {
@@ -109,7 +101,7 @@ static unsigned char virtio_get_status(struct virtio_device *vdev)
 
 static u32_t virtio_get_features(struct virtio_device *vdev)
 {
-	return BIT(VIRTIO_RPMSG_F_NS);
+	return 0;
 }
 
 void virtio_set_status(struct virtio_device *vdev, unsigned char status)
@@ -117,17 +109,16 @@ void virtio_set_status(struct virtio_device *vdev, unsigned char status)
 	sys_write8(status, VDEV_STATUS_ADDR);
 }
 
-#if defined(CONFIG_RPMSG_MASTER)
 static void virtio_set_features(struct virtio_device *vdev, u32_t features)
 {
 	/* No need for implementation */
 }
-#endif
 
 static void virtio_notify(struct virtqueue *vq)
 {
 	int status;
 
+	LOG_DBG("%s", __FUNCTION__);
 	status = ipm_send(ipm_tx_handle, 0, 0, NULL, 0);
 	if (status != 0) {
 		LOG_WRN("Failed to notify: %d", status);
@@ -138,53 +129,47 @@ const struct virtio_dispatch dispatch = {
 	.get_status = virtio_get_status,
 	.get_features = virtio_get_features,
 	.set_status = virtio_set_status,
-#if defined(CONFIG_RPMSG_MASTER)
 	.set_features = virtio_set_features,
-#endif
 	.notify = virtio_notify,
 };
 
 /* Callback launch right after some data has arrived. */
 static void ipm_callback(void *context, u32_t id, volatile void *data)
 {
-	k_sem_give(&rpc.data_rx_sem);
+	LOG_DBG("%s", __FUNCTION__);
+	k_sem_give(&ipm_event_sem);
 }
 
 /* Callback launch right after virtqueue_notification from rx_thread. */
 static int endpoint_cb(struct rpmsg_endpoint *ept, void *data, size_t len,
 		       u32_t src, void *priv)
 {
-	/* We have just received data package. */
-	if (rpc.rx_callback) {
-		rpc.rx_callback(data, len);
+	struct rp_ll_endpoint *my_ep = metal_container_of(ept,
+		struct rp_ll_endpoint, rpmsg_ep);
+
+	LOG_DBG("%s", __FUNCTION__);
+
+	if (len == 0) {
+		if (!(my_ep->flags & EP_FLAG_HANSHAKE_DONE)) {
+			rpmsg_send(ept, (u8_t*)"", 0);
+			my_ep->flags |= EP_FLAG_HANSHAKE_DONE;
+			LOG_INF("Handshake done");
+			my_ep->callback(my_ep, RP_LL_EVENT_CONNECTED, NULL, 0);
+		}
+		return RPMSG_SUCCESS;
 	}
+
+	my_ep->callback(my_ep, RP_LL_EVENT_DATA, data, len);
 
 	return RPMSG_SUCCESS;
 }
 
 static void rpmsg_service_unbind(struct rpmsg_endpoint *ep)
 {
+	LOG_DBG("%s", __FUNCTION__);
 	rpmsg_destroy_ept(ep);
 }
 
-static void ns_bind_cb(struct rpmsg_device *rdev,
-		       const char *name, u32_t dest)
-{
-	(void)rpmsg_create_ept(&ep, rdev, name, RPMSG_ADDR_ANY,
-			       dest, endpoint_cb, rpmsg_service_unbind);
-
-	k_sem_give(&rpc.ept_sem);
-}
-
-/**@brief Hadles rx notifications.
- *
- * rx_thread is responsible for notification the rpmsg library to launch
- * endpoint_cb
- *
- * @param[in] p1 Not used.
- * @param[in] p2 Not used.
- * @param[in] p3 Not used.
- */
 static void rx_thread(void *p1, void *p2, void *p3)
 {
 	ARG_UNUSED(p1);
@@ -192,29 +177,28 @@ static void rx_thread(void *p1, void *p2, void *p3)
 	ARG_UNUSED(p3);
 
 	while (1) {
-		int status = k_sem_take(&rpc.data_rx_sem, K_FOREVER);
-
+		int status = k_sem_take(&ipm_event_sem, K_FOREVER);
 		if (status == 0) {
+			LOG_INF("%s - call", __FUNCTION__);
 			virtqueue_notification(IS_ENABLED(CONFIG_RPMSG_MASTER) ?
 					       vq[0] : vq[1]);
 		}
 	}
 }
 
-int ipc_transmit(const u8_t *buff, size_t buff_len)
+int rp_ll_send(struct rp_ll_endpoint *endpoint, const u8_t *buf,
+	size_t buf_len)
 {
-	int ret = 0;
+	int ret;
 
-	ret = rpmsg_send(&ep, buff, buff_len);
-
+	ret = rpmsg_send(&endpoint->rpmsg_ep, buf, buf_len);
 	if (ret > 0) {
 		ret = 0;
 	}
-
 	return ret;
 }
 
-int ipc_init(void)
+int rp_ll_init(void)
 {
 	int err;
 	struct metal_init_params metal_params = METAL_INIT_DEFAULTS;
@@ -224,16 +208,10 @@ int ipc_init(void)
 	static struct metal_io_region *shm_io;
 	static struct metal_device *device;
 	static struct rpmsg_virtio_shm_pool shpool;
+	struct rpmsg_virtio_shm_pool *pshpool = NULL;
 
 	/* Init semaphores. */
-	k_sem_init(&rpc.data_rx_sem, 0, 1);
-	k_sem_init(&rpc.ept_sem, 0, 1);
-
-	k_thread_create(&rx_thread_data, rx_thread_stack,
-			K_THREAD_STACK_SIZEOF(rx_thread_stack),
-			rx_thread, NULL, NULL, NULL,
-			K_PRIO_COOP(PRIORITY), 0,
-			K_NO_WAIT);
+	k_sem_init(&ipm_event_sem, 0, 1);
 
 	/* Libmetal setup. */
 	err = metal_init(&metal_params);
@@ -275,7 +253,11 @@ int ipc_init(void)
 		return -ENODEV;
 	}
 
+	LOG_DBG("Before ipm_register_callback");
+
 	ipm_register_callback(ipm_rx_handle, ipm_callback, NULL);
+
+	LOG_DBG("Before virtqueue_allocate");
 
 	/* Virtqueue setup. */
 	vq[0] = virtqueue_allocate(VRING_SIZE);
@@ -315,49 +297,63 @@ int ipc_init(void)
 		 */
 		rpmsg_virtio_init_shm_pool(&shpool, (void *)SHM_START_ADDR,
 					   SHM_SIZE);
+		pshpool = &shpool;
 
-		err = rpmsg_init_vdev(&rvdev, &vdev, ns_bind_cb, shm_io,
-				      &shpool);
-		if (err) {
-			LOG_ERR("RPMSG vdev initialization failed %d", err);
-			return err;
-		}
-
-		/* Wait til nameservice ep is setup */
-		k_sem_take(&rpc.ept_sem, K_FOREVER);
-
-		LOG_INF("Endpoint set successfully");
-
-	} else {
-
-		/* Setup rvdev. */
-		err = rpmsg_init_vdev(&rvdev, &vdev, NULL, shm_io, NULL);
-		if (err != 0) {
-			LOG_ERR("RPMSH vdev initialization failed %d", err);
-		}
-
-		/* Get RPMsg device from RPMsg VirtIO device. */
-		rdev = rpmsg_virtio_get_rpmsg_device(&rvdev);
-
-		err = rpmsg_create_ept(&ep, rdev, "bt_ser", RPMSG_ADDR_ANY,
-				       RPMSG_ADDR_ANY,
-				       endpoint_cb, rpmsg_service_unbind);
-		if (err != 0) {
-			LOG_ERR("RPMSH endpoint cretate failed %d", err);
-		}
 	}
+
+	LOG_DBG("Before rpmsg_init_vdev");
+
+	/* Setup rvdev. */
+	err = rpmsg_init_vdev(&rvdev, &vdev, NULL, shm_io, pshpool);
+	if (err != 0) {
+		LOG_ERR("RPMSH vdev initialization failed %d", err);
+	}
+
+	/* Get RPMsg device from RPMsg VirtIO device. */
+	rdev = rpmsg_virtio_get_rpmsg_device(&rvdev);
+
+	k_thread_create(&rx_thread_data, rx_thread_stack,
+			K_THREAD_STACK_SIZEOF(rx_thread_stack),
+			rx_thread, NULL, NULL, NULL,
+			K_PRIO_COOP(PRIORITY), 0,
+			K_NO_WAIT);
+
+	LOG_DBG("initializing rp_ll_init: SUCCESS");
+
+	return 0;
+
+}
+
+int rp_ll_endpoint_init(struct rp_ll_endpoint *endpoint,
+	int endpoint_number, rp_ll_event_handler callback, void *user_data)
+{
+	int err;
+
+	endpoint->callback = callback;
+
+	LOG_DBG("Before rpmsg_create_ept");
+
+	err = rpmsg_create_ept(&endpoint->rpmsg_ep, rdev, "", endpoint_number,
+		endpoint_number, endpoint_cb, rpmsg_service_unbind);
+
+	if (err != 0) {
+		LOG_ERR("RPMSH endpoint cretate failed %d", err);
+		return err;
+	}
+
+	rpmsg_send(&endpoint->rpmsg_ep, (u8_t*)"", 0);
 
 	return 0;
 }
 
-void ipc_deinit(void)
+void rp_ll_endpoint_uninit(struct rp_ll_endpoint *endpoint)
+{
+	rpmsg_destroy_ept(&endpoint->rpmsg_ep);
+}
+
+void rp_ll_uninit(void)
 {
 	rpmsg_deinit_vdev(&rvdev);
 	metal_finish();
 	LOG_INF("IPC deinitialised");
-}
-
-void ipc_register_rx_callback(rx_callback cb)
-{
-	rpc.rx_callback = cb;
 }

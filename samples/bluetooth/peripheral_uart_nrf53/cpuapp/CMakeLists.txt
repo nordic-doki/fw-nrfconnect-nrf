@@ -18,7 +18,7 @@ project(NONE)
 target_sources(app PRIVATE
   src/main.c
   ../common/bt_ser.c
-  ../common/rpmsg.c
+  ../common/rp_ll_api.c
 )
 # NORDIC SDK APP END
 

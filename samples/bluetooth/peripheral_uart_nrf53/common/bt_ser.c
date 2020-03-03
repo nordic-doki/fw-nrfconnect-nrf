@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <kernel.h>
 #include <zephyr/types.h>
-
+#if 0
 #include <bluetooth/addr.h>
 
 #if defined(NRF5340_XXAA_NETWORK)
@@ -16,7 +16,7 @@
 #endif
 
 #include "bt_ser.h"
-#include "rpmsg.h"
+#include "trans_rpmsg.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(bt_ser);
@@ -621,3 +621,4 @@ int bt_nus_received_evt_send(const bt_addr_le_t *addr, const u8_t *data,
 
 	return evt_send(addr, BT_EVENT_DATA_RECEIVED, data, length);
 }
+#endif

@@ -11,6 +11,12 @@
 #include <zephyr/types.h>
 #include <zephyr.h>
 
+
+#include <stdio.h>
+
+#include "rp_ll_api.h"
+
+#if 0
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/uuid.h>
 #include <bluetooth/gatt.h>
@@ -18,11 +24,7 @@
 
 #include <bluetooth/services/nus.h>
 #include <settings/settings.h>
-
-#include <stdio.h>
-
 #include "bt_ser.h"
-#include "rpmsg.h"
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -193,24 +195,54 @@ void bt_ready(int err)
 		printk("Advertising failed to start (err %d)\n", err);
 	}
 }
+//---------------------------------
 
-void main(void)
+#endif
+
+struct k_delayed_work dw;
+
+struct rp_ll_endpoint ep1;
+
+void send_later(struct k_work *work)
 {
-	int err = 0;
+	printk("Sending...\n");
+	rp_ll_send(&ep1, (u8_t*)"abc", 3);
+	k_delayed_work_submit(&dw, K_MSEC(5000));
+	//k_sleep(1000);
+	//rp_ll_endpoint_uninit(&ep1);
+}
 
-	printk("Starting Nordic UART service example[NET CORE]\n");
 
-	ipc_register_rx_callback(bt_nus_rx_parse);
+void test_callback(struct rp_ll_endpoint *endpoint,
+	enum rp_ll_event_type event, const u8_t *buf, size_t length)
+{
+	printk("Event: %d, len: %d", event, length);
+}
 
-	err = ipc_init();
-	if (err) {
-		printk("RPMSG serialization init error %d\n", err);
-		return;
+void rp_test()
+{
+
+	if (IS_ENABLED(CONFIG_RPMSG_MASTER)) {
+		printk("=== MASTER");
+	} else {
+		printk("=== SLAVE");
 	}
 
-	bt_conn_cb_register(&conn_callbacks);
+	rp_ll_init();
+	
+	rp_ll_endpoint_init(&ep1, 0, test_callback, NULL);
 
-	if (IS_ENABLED(CONFIG_BT_GATT_NUS_SECURITY_ENABLED)) {
-		bt_conn_auth_cb_register(&conn_auth_callbacks);
-	}
+	k_delayed_work_init(&dw, send_later);
+
+	if (IS_ENABLED(CONFIG_RPMSG_MASTER))
+		k_delayed_work_submit(&dw, K_MSEC(1000));
+}
+
+int main()
+{
+	k_sleep(K_MSEC(5000));
+
+	rp_test();
+
+	return 0;
 }
