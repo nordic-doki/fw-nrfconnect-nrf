@@ -204,3 +204,231 @@ void rp_test()
 
 	printk("DONE\n");
 }
+
+typedef void (*enum_services_callback)(const char* name);
+
+// callback called from transport receive thread
+static void rx_callback(struct rpser_endpoint *ep, u8_t* buf, size_t length)
+{
+	// it is safe to modify it, because other thread will read/write it
+	// only after give(decode_sem) and before take(decode_done_sem)
+	ep->decode_buffer = buf;
+	ep->decode_length = length;
+	// Two times because first may give to endpoint thread even when
+	// other thread is waiting. Endpoint thread will start and hang on mutex
+	// lock in this situation. This allows other thread to execute and
+	// consume data
+	k_sem_give(&ep->decode_sem);
+	k_sem_give(&ep->decode_sem);
+	// Wait when decoding is done to safely return buffers to caller
+	k_sem_take(&ep->decode_done_sem, K_FOREVER);
+}
+
+// thread for each endpoint
+static void rpser_endpoint_thread(void *p1, void *p2, void *p3)
+{
+	struct rpser_endpoint *ep = (struct rp_trans_endpoint *)p1;
+
+	while (1) {
+		// wait for incoming packets
+		k_sem_take(&ep->decode_sem, K_FOREVER);
+		if (ep->decode_buffer) {
+			// lock entire endpoint, so no other thread can access it
+			k_mutex_lock(ep->mutex, K_FOREVER);
+			// consume incoming data
+			u8_t *a = ep->decode_buffer;
+			size_t b = ep->decode_length;
+			ep->decode_buffer = NULL;
+			ep->decode_length = 0;
+			handle_packet(a, b);
+			k_mutex_unlock(ep->mutex);
+		}
+	}
+}
+
+// called from endpoint thread or loop waiting for response
+void handle_packet(u8_t* data, size_t length)
+{
+	packet_type type = data[0];
+	// We get response - this kind of packet should be handled before
+	__ASSERT(type != PACKET_TYPE_RESPONSE, "Response packet without any call");
+
+	// This contition may only be true in endpoint thread (maybe add assert?)
+	if (type == PACKET_TYPE_ACK) {
+		ep->waiting_for_ack = false;
+		return;
+	}
+
+	decoder_callback decoder = get_decoder_from_data(data);
+
+	// If we are executing command then the other end is waiting for
+	// response, so sending notifications and commands is available again now.
+	bool prev_wait_for_ack = ep->waiting_for_ack;
+	if (packet_type == PACKET_TYPE_CMD) {
+		ep->waiting_for_ack = false;
+	}
+
+	decoder(type, &data[5], length - 5);
+
+	// Resore previous state of waiting for ack
+	if (packet_type == PACKET_TYPE_CMD) {
+		ep->waiting_for_ack = prev_wait_for_ack;
+	}
+}
+
+// Waits for feedback packet (response or ack) packet.
+void wait_for_feedback(struct rpser_endpoint *ep, packet_type expected_type)
+{
+	packet_type type;
+	do {
+		// Wait for something from rx callback
+		k_sem_take(&ep->decode_sem);
+		// semafore may be given two times, so make sure that buffer is valid
+		if (ep->decode_buffer) {
+			type = item->buffer[0];
+			// If we are waiting for response following are expected:
+			//      PACKET_TYPE_CMD, PACKET_TYPE_NOTIFY - execute now
+			//      PACKET_TYPE_RESPONSE - exit this function
+			//      PACKET_TYPE_ACK - invalid: if we are wating for response then we already get ack before
+			// If we are waiting for ack:
+			//      PACKET_TYPE_CMD, PACKET_TYPE_NOTIFY - execute now
+			//      PACKET_TYPE_ACK - exit this function
+			//      PACKET_TYPE_RESPONSE - invalid: handling of notification is not finished yet, so no command was send before
+			if (type == expected_type) {
+				break;
+			} else {
+				__ASSERT(type == PACKET_TYPE_CMD || type == PACKET_TYPE_NOTIFY, "Feedback packet different than expected");
+				u8_t *a = ep->decode_buffer;
+				size_t b = ep->decode_length;
+				ep->decode_buffer = NULL;
+				ep->decode_length = 0;
+				handle_packet(a, b);
+			}
+		}
+	} while (true);
+}
+
+// Call after send of command to wait for response
+void wait_for_response(struct rpser_endpoint *ep, struct decode_buffer *out)
+{
+	// Wait for response packet
+	wait_for_feedback(ep, PACKET_TYPE_RESPONSE);
+	// Consume buffer (decode done will be send later)
+	out->buffer = ep->decode_buffer;
+	out->length = ep->decode_length;
+	ep->decode_buffer = NULL;
+	ep->decode_length = 0;
+}
+
+// Called before sending command or notify to make sure that last notification was finished and the other end
+// can handle this packet imidetally.
+void wait_for_last_ack(struct rpser_endpoint *ep)
+{
+	if (ep->waiting_for_ack)
+	{
+		// Wait for ack packet
+		wait_for_feedback(ep, PACKET_TYPE_ACK);
+		// Tell rx callback that decoding is not and it may continue
+		k_sem_give(ep->decode_done_sem);
+		// We are not wating anymore
+		ep->waiting_for_ack = false;
+	}
+}
+
+// Call remote function (command): send cmd and data, wait and return response
+void call_remote(struct rpser_endpoint *ep, struct decode_buffer *in, struct decode_buffer *out)
+{
+	// Endpoint is not accessible by other thread from this point
+	k_mutex_lock(ep->mutex, K_FOREVER);
+	// Make sure that someone can handle packet immidietallty
+	wait_for_last_ack(ep);
+	// Send buffer to transport layer
+	rp_trans_send(&ep->trans_ep, in->data, in->length);
+	// Wait for response. During waiting nested commands and notifications are possible
+	wait_for_response(ep, out);
+	// Decoding and sednig 'decode done' to callback is in decode_response_done
+}
+
+// Execute notification: send notification, do not wait - only mark that we are expecting ack later
+void notify_remote(struct rpser_endpoint *ep, struct decode_buffer *in)
+{
+	// Endpoint is not accessible by other thread from this point
+	k_mutex_lock(ep->mutex, K_FOREVER);
+	// Make sure that someone can handle packet immidietallty
+	wait_for_last_ack(ep);
+	// we are expecting ack later
+	ep->waiting_for_ack = true;
+	// Send buffer to transport layer
+	rp_trans_send(&ep->trans_ep, in->data, in->length);
+	// We can unlock now, nothing more to do
+	k_mutex_unlock(ep->mutex);
+}
+
+// Inform that decoding is done and nothing more must be done
+void decode_response_done(struct rpser_endpoint *ep)
+{
+	k_sem_give(ep->decode_done_sem);
+	k_mutex_unlock(ep->mutex);
+}
+
+// example function
+int enum_services(enum_services_callback callback, int max_count)
+{
+	int result;
+	struct encode_buffer buf;
+	struct decode_buffer dec;
+	// encode params
+	encode_init_cmd(&buf, ENUM_SERVICES_ID);
+	encode_ptr(&buf, callback);
+	encode_int(&buf, max_count);
+	// call and wait
+	call_remote(&my_ep, &buf, &dec);
+	// decode result
+	decode_int(&dec, &result);
+	// inform rx callback that decoding is done and it can continue (discard buffers)
+	decode_response_done(&my_ep);
+	return result;
+}
+
+// example notification
+void notify_update(int count)
+{
+	struct encode_buffer buf;
+	// encode params
+	encode_init_notification(&buf, NOTIFY_UPDATE_ID);
+	encode_int(&buf, count);
+	// send notification
+	notify_remote(&my_ep, &buf, &dec);
+}
+
+// called by decoder to inform rx callback that decoding is done and it can continue (discard buffers)
+void decode_params_done(struct rpser_endpoint *ep)
+{
+	k_sem_give(ep->decode_done_sem);
+}
+
+// example decoder (universal: for both commands and notifications)
+void call_callback_b_s(struct rpser_endpoint *ep, struct decode_buffer *dec)
+{
+	bool result;
+	char str[32];
+	enum_services_callback callback;
+	struct encode_buffer buf;
+	// decode params
+	decode_ptr(dec, &callback);
+	decode_str(dec, str, 32);
+	// inform rx callback that decoding is done and it can continue (discard buffers)
+	decode_params_done(ep);
+	// execute actual code
+	result = callback(name);
+	if (type == PACKET_TYPE_CMD) {
+		// cndode response
+		encode_init_response(&buf);
+		encode_bool(&buf, result);
+		// and send response
+		send_response(ep, buf);
+	} else {
+		// send that notification is done
+		send_notify_ack(ep);
+	}
+}
