@@ -13,7 +13,7 @@
 #include <metal/alloc.h>
 #include <openamp/open_amp.h>
 
-void rp_test();
+#include "rp_ll_api.h"
 
 /**
  * @file
@@ -28,9 +28,13 @@ extern "C" {
 
 
 struct rp_trans_endpoint {
-	void* user_data;
-	struct rpmsg_endpoint *rpmsg_ep;
+	struct rp_ll_endpoint ep;
 	struct k_sem sem;
+	struct k_thread thread;
+	k_thread_stack_t *stack;
+	void *stack_buffer;
+	struct k_fifo fifo;
+	volatile bool running;
 };
 
 /** @brief Callback called from endpoint's rx thread when a new packet arrived.
@@ -51,12 +55,12 @@ int rp_trans_init(rp_trans_receive_handler callback);
 
 /** @brief Uninitializes RP transport layer
  */
-int rp_trans_uninit(void);
+void rp_trans_uninit(void);
 
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
-	int endpoint_number, void *user_data);
+	int endpoint_number, size_t stack_size, int prio);
 
-int rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint);
+void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint);
 
 /** @brief Allocates a buffer to transmit packet.
  *
@@ -89,77 +93,5 @@ int rp_trans_send(struct rp_trans_endpoint *endpoint, const u8_t *buf,
 #ifdef __cplusplus
 }
 #endif
-
-#endif
-
-
-#ifdef SOME_UNDEF
-/*
- * Copyright (c) 2020 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#ifndef RPMSG_H_
-#define RPMSG_H_
-
-/**
- * @file
- * @defgroup rpmsg.h IPC communication lib
- * @{
- * @brief IPC communication lib.
- */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef int (*rx_callback) (const u8_t *data, size_t len);
-
-/**@brief Register receive callback.
- *
- * Callback is fired when data is received.
- *
- * @param[in] cb Received data callback.
- */
-void ipc_register_rx_callback(rx_callback cb);
-
-/**@brief Initialize IPM
- *
- * This function initialize IPM instance. It is important
- * to set desire target in the rpmsg.c file (REMOTE or MASTER).
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int ipc_init(void);
-
-/**@brief Deinitialize IPM.
- *
- * This function deinitialize IPM instance.
- */
-void ipc_deinit(void);
-
-/**@brief Send data to the second core.
- *
- * This function sends data to the another core.
- *
- * @param[in] buff Data buffer.
- * @param[in] len Data length.
- *
- * @retval 0 If the operation was successful.
- *           Otherwise, a (negative) error code is returned.
- */
-int ipc_transmit(const u8_t *buff, size_t buff_len);
-
-#ifdef __cplusplus
-}
-#endif
-
-/**
- *@}
- */
-
-#endif /* RPMSG_H_ */
 
 #endif

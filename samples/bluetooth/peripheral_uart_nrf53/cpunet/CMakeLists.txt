@@ -17,8 +17,8 @@ project(NONE)
 # NORDIC SDK APP START
 target_sources(app PRIVATE
   src/main.c
-  ../common/bt_ser.c
   ../common/rp_ll_api.c
+  ../common/trans_rpmsg.c
 )
 
 # NORDIC SDK APP END

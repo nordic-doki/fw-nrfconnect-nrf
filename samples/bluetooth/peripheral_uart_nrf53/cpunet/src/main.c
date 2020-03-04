@@ -199,48 +199,11 @@ void bt_ready(int err)
 
 #endif
 
-struct k_delayed_work dw;
-
-struct rp_ll_endpoint ep1;
-
-void send_later(struct k_work *work)
-{
-	printk("Sending...\n");
-	rp_ll_send(&ep1, (u8_t*)"abc", 3);
-	k_delayed_work_submit(&dw, K_MSEC(5000));
-	//k_sleep(1000);
-	//rp_ll_endpoint_uninit(&ep1);
-}
-
-
-void test_callback(struct rp_ll_endpoint *endpoint,
-	enum rp_ll_event_type event, const u8_t *buf, size_t length)
-{
-	printk("Event: %d, len: %d", event, length);
-}
-
-void rp_test()
-{
-
-	if (IS_ENABLED(CONFIG_RPMSG_MASTER)) {
-		printk("=== MASTER");
-	} else {
-		printk("=== SLAVE");
-	}
-
-	rp_ll_init();
-	
-	rp_ll_endpoint_init(&ep1, 0, test_callback, NULL);
-
-	k_delayed_work_init(&dw, send_later);
-
-	if (IS_ENABLED(CONFIG_RPMSG_MASTER))
-		k_delayed_work_submit(&dw, K_MSEC(1000));
-}
+void rp_test();
 
 int main()
 {
-	k_sleep(K_MSEC(5000));
+	k_sleep(K_MSEC(1000));
 
 	rp_test();
 
