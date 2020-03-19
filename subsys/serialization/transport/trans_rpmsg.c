@@ -53,26 +53,6 @@ static int translate_error(int rpmsg_err)
 	return RP_SUCCESS;
 }
 
-
-static void *stack_allocate(k_thread_stack_t **stack, size_t stack_size)
-{
-	u8_t *buffer =
-		k_malloc(K_THREAD_STACK_LEN(stack_size) + STACK_ALIGN + 1);
-	uintptr_t ptr = (uintptr_t)buffer;
-	uintptr_t unaligned = ptr % STACK_ALIGN;
-
-	if (buffer == NULL) {
-		*stack = NULL;
-		LOG_ERR("Endpoint thread stack allocation failed!");
-		__ASSERT(buffer, "Out of memory");
-	} else if (unaligned == 0) {
-		*stack = (k_thread_stack_t *)buffer;
-	} else {
-		*stack = (k_thread_stack_t *)(&buffer[STACK_ALIGN - unaligned]);
-	}
-	return buffer;
-}
-
 int rp_trans_init(rp_trans_receive_handler callback)
 {
 	int result;
@@ -134,15 +114,12 @@ static void event_handler(struct rp_ll_endpoint *ep,
 }
 
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
-	int endpoint_number, size_t stack_size, int prio)
+	int endpoint_number)
 {
 	int result;
-
-	endpoint->stack_buffer = stack_allocate(&endpoint->stack, stack_size);
-	if (endpoint->stack_buffer == NULL) {
-		LOG_ERR("Cannot allocate stack for endpoint rx thread!");
-		return -ENOMEM;
-	}
+	int prio = endpoint->prio;
+	size_t stack_size = endpoint->stack_size;
+	k_thread_stack_t *stack = endpoint->stack;
 
 	endpoint->running = true;
 
@@ -159,8 +136,8 @@ int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 
 	k_sem_take(&endpoint->sem, K_FOREVER);
 
-	k_thread_create(&endpoint->thread, endpoint->stack, stack_size,
-		endpoint_thread, endpoint, NULL, NULL, prio, 0, K_NO_WAIT);
+	k_thread_create(&endpoint->thread, stack, stack_size, endpoint_thread,
+		endpoint, NULL, NULL, prio, 0, K_NO_WAIT);
 
 	return RP_SUCCESS;
 }
@@ -188,8 +165,6 @@ void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint)
 		}
 		k_free(item);
 	} while (true);
-
-	k_free(endpoint->stack_buffer);
 }
 
 int rp_trans_send(struct rp_trans_endpoint *endpoint, const u8_t *buf,
