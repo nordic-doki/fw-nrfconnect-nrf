@@ -61,6 +61,7 @@ typedef void (*bt_ready_cb_t)(int err);
 
 int bt_enable(bt_ready_cb_t cb);
 	SERIALIZABLE();
+	SERIALIZABLE(TODO("May also send GATT services from flash at this point"));
 
 
 int bt_set_name(const char *name);
