@@ -32,24 +32,49 @@ extern "C" {
 
 struct rp_trans_endpoint {
 	struct rp_ll_endpoint ep;
-	struct k_sem sem;
-	struct k_thread thread;
-	k_thread_stack_t *stack;
-	void *stack_buffer;
-	struct k_fifo fifo;
-	bool running;
+	/* Union allows reuse of memory taken by fields that are never used in
+	 * the same time.
+	 */
+	union {
+		/* Group of fields that is used only for initialization. */
+		struct {
+			k_thread_stack_t *stack;
+			size_t stack_size;
+			int prio;
+		};
+		/* Group of fields that is used only after initialization. */
+		struct {
+			struct k_sem sem;
+			struct k_thread thread;
+			struct k_fifo fifo;
+			bool running;
+		};
+	};
 };
+
+#define RP_TRANS_ENDPOINT_PREPARE(_name, _stack_size, _prio)                   \
+	K_THREAD_STACK_DEFINE(RP_CONCAT(_rp_trans_stack_, _name),              \
+			(_stack_size));                                        \
+	static const size_t RP_CONCAT(_rp_trans_stack_size_, _name) =          \
+			(_stack_size);                                         \
+	static const int RP_CONCAT(_rp_trans_prio_, _name) = (_prio)
+
+#define RP_TRANS_ENDPOINT_INITIALIZER(_name)                                   \
+	{                                                                      \
+		.stack = RP_CONCAT(_rp_trans_stack_, _name),                   \
+		.stack_size = RP_CONCAT(_rp_trans_stack_size_, _name),         \
+		.prio = RP_CONCAT(_rp_trans_prio_, _name),                     \
+	}
 
 typedef void (*rp_trans_receive_handler)(struct rp_trans_endpoint *endpoint,
 	const u8_t *buf, size_t length);
 
 int rp_trans_init(rp_trans_receive_handler callback);
 
-
 void rp_trans_uninit(void);
 
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
-	int endpoint_number, size_t stack_size, int prio);
+	int endpoint_number);
 
 void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint);
 
