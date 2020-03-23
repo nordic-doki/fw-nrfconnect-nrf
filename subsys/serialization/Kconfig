@@ -26,6 +26,20 @@ config RPMSG_MASTER
 
 endchoice
 
+config RP_TRANS_PRMSG_RX_STACK_SIZE
+	int "Stack size of the rpmsg receive thread"
+	default 512
+	help
+	  Stack size for the thread that is responsible for receiving incoming
+	  messages from rpmsg.
+
+config RP_TRANS_PRMSG_RX_PRIORITY
+	int "Priority of the rpmsg receive thread"
+	default 7
+	help
+	  Priority of the thread that is responsible for receiving incoming
+	  messages from rpmsg.
+
 endif # RP_SERIALIZATION
 
 endmenu

@@ -57,6 +57,7 @@ int rp_trans_init(rp_trans_receive_handler callback)
 {
 	int result;
 
+	__ASSERT(callback, "Callback cannot be NULL");
 	receive_handler = callback;
 	result = rp_ll_init();
 	return translate_error(result);

@@ -21,12 +21,6 @@ LOG_MODULE_REGISTER(rp_ll_api);
 
 static struct k_sem ipm_event_sem;
 
-/* Stack size of stack area used by rx thread */
-#define STACKSIZE 1024
-
-/* Scheduling priority used by rx thread */
-#define PRIORITY 7
-
 /* Indicates that handshake was done by this endpoint */
 #define EP_FLAG_HANSHAKE_DONE 1
 
@@ -77,8 +71,13 @@ static struct metal_device shm_device = {
 
 static struct virtqueue *vq[2];
 
+static struct virtio_vring_info rvrings[2];
+static struct virtio_device vdev;
+static struct rpmsg_virtio_shm_pool shpool;
+
 /* Thread properties */
-static K_THREAD_STACK_DEFINE(rx_thread_stack, STACKSIZE);
+static K_THREAD_STACK_DEFINE(rx_thread_stack,
+	CONFIG_RP_TRANS_PRMSG_RX_STACK_SIZE);
 static struct k_thread rx_thread_data;
 
 
@@ -186,12 +185,8 @@ int rp_ll_init(void)
 {
 	int err;
 	struct metal_init_params metal_params = METAL_INIT_DEFAULTS;
-
-	static struct virtio_vring_info rvrings[2];
-	static struct virtio_device vdev;
-	static struct metal_io_region *shm_io;
-	static struct metal_device *device;
-	static struct rpmsg_virtio_shm_pool shpool;
+	struct metal_io_region *shm_io;
+	struct metal_device *device;
 	struct rpmsg_virtio_shm_pool *pshpool = NULL;
 
 	/* Init semaphores. */
@@ -293,7 +288,7 @@ int rp_ll_init(void)
 	k_thread_create(&rx_thread_data, rx_thread_stack,
 			K_THREAD_STACK_SIZEOF(rx_thread_stack),
 			rx_thread, NULL, NULL, NULL,
-			K_PRIO_COOP(PRIORITY), 0,
+			K_PRIO_COOP(CONFIG_RP_TRANS_PRMSG_RX_PRIORITY), 0,
 			K_NO_WAIT);
 
 	LOG_DBG("initializing %s: SUCCESS", __func__);
