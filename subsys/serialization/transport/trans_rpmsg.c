@@ -167,10 +167,30 @@ void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint)
 	} while (true);
 }
 
+#define STACKSIZE2 1024
+#define PRIORITY2 7
+
+struct k_work_q my_work_q2;
+struct k_work work_item2;
+
+static K_THREAD_STACK_DEFINE(rx_thread_stack2, STACKSIZE2);
+
+void work_callback2(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	__asm volatile("nop\n":::);
+}
+
 int rp_trans_send(struct rp_trans_endpoint *endpoint, const u8_t *buf,
 	size_t buf_len)
 {
 	int result = rp_ll_send(&endpoint->ep, buf, buf_len);
+
+
+	k_work_q_start(&my_work_q2, rx_thread_stack2,
+               K_THREAD_STACK_SIZEOF(rx_thread_stack2), K_PRIO_COOP(PRIORITY2));
+	k_work_init(&work_item2, work_callback2);
+	k_work_submit_to_queue(&my_work_q2, &work_item2);
 
 	return translate_error(result);
 }

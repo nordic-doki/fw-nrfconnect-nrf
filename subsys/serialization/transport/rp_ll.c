@@ -19,7 +19,15 @@
 
 LOG_MODULE_REGISTER(rp_ll_api);
 
+#define DO_WORKQUEUE 0
+#define DO_STACKUSAGE 0
+
+#if DO_WORKQUEUE
+struct k_work_q my_work_q;
+struct k_work work_item;
+#else
 static struct k_sem ipm_event_sem;
+#endif
 
 /* Stack size of stack area used by rx thread */
 #define STACKSIZE 1024
@@ -79,7 +87,9 @@ static struct virtqueue *vq[2];
 
 /* Thread properties */
 static K_THREAD_STACK_DEFINE(rx_thread_stack, STACKSIZE);
+#if !DO_WORKQUEUE
 static struct k_thread rx_thread_data;
+#endif
 
 
 static unsigned char virtio_get_status(struct virtio_device *vdev)
@@ -124,7 +134,12 @@ const struct virtio_dispatch dispatch = {
 /* Callback launch right after some data has arrived. */
 static void ipm_callback(void *context, u32_t id, volatile void *data)
 {
+#if DO_WORKQUEUE
+	//k_work_submit(&work_item);
+	k_work_submit_to_queue(&my_work_q, &work_item);
+#else
 	k_sem_give(&ipm_event_sem);
+#endif
 }
 
 /* Callback launch right after virtqueue_notification from rx_thread. */
@@ -154,6 +169,33 @@ static void rpmsg_service_unbind(struct rpmsg_endpoint *ep)
 	rpmsg_destroy_ept(ep);
 }
 
+#if DO_STACKUSAGE
+__attribute__((noinline))
+void virtqueue_notification2(struct virtqueue *vq)
+{
+	uintptr_t sp;
+	__asm volatile (
+		"mov %0, sp\n"
+		:"=r"(sp)
+	);
+	uintptr_t sp_start = (uintptr_t)(&rx_thread_stack[sizeof(rx_thread_stack) / sizeof(rx_thread_stack[0])]);
+	printk("stack: %d\n", (int)(sp_start - sp));
+	virtqueue_notification(vq);
+}
+#define virtqueue_notification virtqueue_notification2
+#endif
+
+#if DO_WORKQUEUE
+
+void work_callback(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	virtqueue_notification(IS_ENABLED(CONFIG_RPMSG_MASTER) ?
+			       vq[0] : vq[1]);
+}
+
+#else 
+
 static void rx_thread(void *p1, void *p2, void *p3)
 {
 	ARG_UNUSED(p1);
@@ -169,6 +211,8 @@ static void rx_thread(void *p1, void *p2, void *p3)
 		}
 	}
 }
+
+#endif
 
 int rp_ll_send(struct rp_ll_endpoint *endpoint, const u8_t *buf,
 	size_t buf_len)
@@ -195,7 +239,9 @@ int rp_ll_init(void)
 	struct rpmsg_virtio_shm_pool *pshpool = NULL;
 
 	/* Init semaphores. */
+#if !DO_WORKQUEUE
 	k_sem_init(&ipm_event_sem, 0, 1);
+#endif
 
 	/* Libmetal setup. */
 	err = metal_init(&metal_params);
@@ -290,12 +336,18 @@ int rp_ll_init(void)
 	/* Get RPMsg device from RPMsg VirtIO device. */
 	rdev = rpmsg_virtio_get_rpmsg_device(&rvdev);
 
+#if DO_WORKQUEUE
+	k_work_q_start(&my_work_q, rx_thread_stack,
+               K_THREAD_STACK_SIZEOF(rx_thread_stack), K_PRIO_COOP(PRIORITY));
+	k_work_init(&work_item, work_callback);
+#else
+
 	k_thread_create(&rx_thread_data, rx_thread_stack,
 			K_THREAD_STACK_SIZEOF(rx_thread_stack),
 			rx_thread, NULL, NULL, NULL,
 			K_PRIO_COOP(PRIORITY), 0,
 			K_NO_WAIT);
-
+#endif
 	LOG_DBG("initializing %s: SUCCESS", __func__);
 
 	return 0;
