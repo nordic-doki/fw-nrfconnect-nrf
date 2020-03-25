@@ -31,7 +31,7 @@ extern "C" {
 
 
 struct rp_trans_endpoint {
-	struct rp_ll_endpoint ep;
+	struct rp_ll_endpoint ll_ep;
 	/* Union allows reuse of memory taken by fields that are never used in
 	 * the same time.
 	 */
@@ -44,13 +44,18 @@ struct rp_trans_endpoint {
 		};
 		/* Group of fields that is used only after initialization. */
 		struct {
-			struct k_sem sem;
-			struct k_thread thread;
-			struct k_fifo fifo;
+			const uint8_t *input_buffer;
+			atomic_t input_length;
 			bool running;
+			bool wait_for_done;
+			struct k_mutex mutex;
+			struct k_sem input_sem;
+			struct k_sem done_sem;
+			struct k_thread thread;
 		};
 	};
 };
+
 
 #define RP_TRANS_ENDPOINT_PREPARE(_name, _stack_size, _prio)                   \
 	K_THREAD_STACK_DEFINE(RP_CONCAT(_rp_trans_stack_, _name),              \
@@ -66,17 +71,18 @@ struct rp_trans_endpoint {
 		.prio = RP_CONCAT(_rp_trans_prio_, _name),                     \
 	}
 
+
 typedef void (*rp_trans_receive_handler)(struct rp_trans_endpoint *endpoint,
-	const u8_t *buf, size_t length);
+	const uint8_t *buf, size_t length);
 
-int rp_trans_init(rp_trans_receive_handler callback);
+typedef uint32_t (*rp_trans_filter)(struct rp_trans_endpoint *endpoint,
+	const uint8_t *buf, size_t length);
 
-void rp_trans_uninit(void);
+
+int rp_trans_init(rp_trans_receive_handler callback, rp_trans_filter filter);
 
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 	int endpoint_number);
-
-void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint);
 
 #define rp_trans_alloc_tx_buf(endpoint, buf, length) \
 	ARG_UNUSED(endpoint); \
@@ -88,6 +94,14 @@ void rp_trans_endpoint_uninit(struct rp_trans_endpoint *endpoint);
 
 int rp_trans_send(struct rp_trans_endpoint *endpoint, const u8_t *buf,
 	size_t buf_len);
+
+void rp_trans_own(struct rp_trans_endpoint *endpoint);
+
+void rp_trans_give(struct rp_trans_endpoint *endpoint);
+
+int rp_trans_read(struct rp_trans_endpoint *endpoint, const uint8_t **buf);
+
+void rp_trans_release_buffer(struct rp_trans_endpoint *endpoint);
 
 #ifdef __cplusplus
 }
