@@ -15,6 +15,30 @@ Thingy:91 integrates the following components:
 You can find more information on the product in the `Thingy:91 product page`_ and in the `Nordic Thingy:91 User Guide`_.
 The |NCS| provides support for developing applications on the Thingy:91.
 
+.. _thingy91_serialports:
+
+Connecting to Thingy:91 serial ports
+************************************
+
+For connecting to Thingy:91, you can use LTE Link Monitor, Trace Collector applications, or a serial terminal.
+In the case of LTE Link Monitor or Trace Collector applications, the baud rate for the communication is set automatically.
+
+If you prefer to use a standard serial terminal, the baud rate has to be specified manually.
+
+Thingy:91 uses the following UART baud rate configuration:
+
+.. list-table::
+   :header-rows: 1
+   :align: center
+
+   * - UART Interface
+     - Baud Rate
+   * - UART_0
+     - 115200
+   * - UART_1
+     - 1000000
+
+
 Firmware
 ********
 
@@ -218,7 +242,7 @@ Building and programming using SEGGER Embedded Studio
 Building and programming on the command line
 ============================================
 
-Complete the command line build setup (see the instructions for :ref:`Windows<build_environment_cli_win>`, :ref:`Linux<build_environment_cli_linux>`, and :ref:`macOS<build_environment_cli_mac>`) before you start building |NCS| projects on the command line.
+Complete the :ref:`command-line build setup <build_environment_cli>` before you start building |NCS| projects on the command line.
 
 To build and program the source code from the command line, complete the following steps:
 

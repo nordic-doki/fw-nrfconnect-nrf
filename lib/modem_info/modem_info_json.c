@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <cJSON.h>
 #include <cJSON_os.h>
-#include <modem_info.h>
-#include <at_cmd_parser/at_params.h>
+#include <modem/modem_info.h>
+#include <modem/at_params.h>
 #include <logging/log.h>
 
 LOG_MODULE_REGISTER(modem_info_json);

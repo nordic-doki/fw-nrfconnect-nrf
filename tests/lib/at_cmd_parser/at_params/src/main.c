@@ -3,8 +3,8 @@
 #include <string.h>
 #include <kernel.h>
 
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
 
 #define TEST_PARAMS 4
 

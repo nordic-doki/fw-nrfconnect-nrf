@@ -10,6 +10,18 @@ define_property(GLOBAL PROPERTY PM_IMAGES
 Each image's directory will be searched for a pm.yml, and will receive a pm_config.h header file with the result.
 Also, the each image's hex file will be automatically associated with its partition.")
 
+macro(add_region name size base placement_strategy)
+  list(APPEND regions ${name})
+  list(APPEND region_arguments "--${name}-size;${size}")
+  list(APPEND region_arguments "--${name}-base-address;${base}")
+  list(APPEND region_arguments "--${name}-placement-strategy;${placement_strategy}")
+endmacro()
+
+macro(add_region_with_dev name size base placement_strategy device)
+  add_region(${name} ${size} ${base} ${placement_strategy})
+  list(APPEND region_arguments "--${name}-device;${device}")
+endmacro()
+
 get_property(PM_IMAGES GLOBAL PROPERTY PM_IMAGES)
 get_property(PM_SUBSYS_PREPROCESSED GLOBAL PROPERTY PM_SUBSYS_PREPROCESSED)
 
@@ -47,19 +59,61 @@ if(PM_IMAGES OR (EXISTS ${static_configuration_file}))
   # Add subsys defined pm.yml to the input_files
   list(APPEND input_files ${PM_SUBSYS_PREPROCESSED})
 
+
+  if (DEFINED CONFIG_SOC_NRF9160)
+    # See nRF9160 Product Specification, chapter "UICR"
+    set(otp_start_addr "0xff8108")
+    set(otp_size 756) # 189 * 4
+  elseif (DEFINED CONFIG_SOC_NRF5340_CPUAPP)
+    # See nRF5340 Product Specification, chapter Application Core -> ... "UICR"
+    set(otp_start_addr "0xff8100")
+    set(otp_size 764)  # 191 * 4
+  endif()
+
+  math(EXPR flash_size "${CONFIG_FLASH_SIZE} * 1024" OUTPUT_FORMAT HEXADECIMAL)
+
+  if (CONFIG_SOC_NRF9160 OR CONFIG_SOC_NRF5340_CPUAPP)
+    add_region(
+      otp
+      ${otp_size}
+      ${otp_start_addr}
+      start_to_end
+      )
+  endif()
+  add_region_with_dev(
+    flash_primary
+    ${flash_size}
+    ${CONFIG_FLASH_BASE_ADDRESS}
+    complex
+    NRF_FLASH_DRV_NAME
+    )
+
+  if (CONFIG_PM_EXTERNAL_FLASH)
+    add_region_with_dev(
+      external_flash
+      ${CONFIG_PM_EXTERNAL_FLASH_SIZE}
+      ${CONFIG_PM_EXTERNAL_FLASH_BASE}
+      start_to_end
+      ${CONFIG_PM_EXTERNAL_FLASH_DEV_NAME}
+      )
+  endif()
+
   set(pm_cmd
     ${PYTHON_EXECUTABLE}
     ${NRF_DIR}/scripts/partition_manager.py
     --input-files ${input_files}
-    --flash-size ${CONFIG_FLASH_SIZE}
-    --output ${CMAKE_BINARY_DIR}/partitions.yml
+    --regions ${regions}
+    --output-partitions ${CMAKE_BINARY_DIR}/partitions.yml
+    --output-regions ${CMAKE_BINARY_DIR}/regions.yml
     ${static_configuration}
+    ${region_arguments}
     )
 
   set(pm_output_cmd
     ${PYTHON_EXECUTABLE}
     ${NRF_DIR}/scripts/partition_manager_output.py
-    --input ${CMAKE_BINARY_DIR}/partitions.yml
+    --input-partitions ${CMAKE_BINARY_DIR}/partitions.yml
+    --input-regions ${CMAKE_BINARY_DIR}/regions.yml
     --config-file ${CMAKE_BINARY_DIR}/pm.config
     --input-names ${images}
     --header-files

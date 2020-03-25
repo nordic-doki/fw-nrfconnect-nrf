@@ -7,12 +7,12 @@
 #include <logging/log.h>
 #include <zephyr.h>
 #include <stdio.h>
-#include <sms.h>
+#include <modem/sms.h>
 #include <errno.h>
-#include <at_cmd.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
-#include <at_notif.h>
+#include <modem/at_cmd.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
+#include <modem/at_notif.h>
 
 LOG_MODULE_REGISTER(sms, CONFIG_SMS_LOG_LEVEL);
 

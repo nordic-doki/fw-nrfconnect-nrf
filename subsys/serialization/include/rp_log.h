@@ -12,33 +12,9 @@ extern "C" {
 #endif
 
 #define RP_MODULE_PREFIX  _CONCAT(RP_, RP_LOG_MODULE)
-/*
- * The following macros from nrfx_config control the log messages coming from
- * a given module:
- * - RP <module>_CONFIG_LOG_ENABLED enables the messages (when set to 1)
- * - RP <module>_CONFIG_LOG_LEVEL specifies the severity level of the messages
- *   that are to be output.
- */
-#if !IS_ENABLED(_CONCAT(RP_MODULE_PREFIX, _CONFIG_LOG_ENABLED))
-#define RP_MODULE_CONFIG_LOG_LEVEL 0
-#else
-#define RP_MODULE_CONFIG_LOG_LEVEL \
-	_CONCAT(RP_MODULE_PREFIX, _CONFIG_LOG_LEVEL)
-#endif
 
-#if	RP_MODULE_CONFIG_LOG_LEVEL == 0
-#define RP_MODULE_LOG_LEVEL		LOG_LEVEL_NONE
-#elif	RP_MODULE_CONFIG_LOG_LEVEL == 1
-#define RP_MODULE_LOG_LEVEL		LOG_LEVEL_ERR
-#elif	RP_MODULE_CONFIG_LOG_LEVEL == 2
-#define RP_MODULE_LOG_LEVEL		LOG_LEVEL_WRN
-#elif	RP_MODULE_CONFIG_LOG_LEVEL == 3
-#define RP_MODULE_LOG_LEVEL		LOG_LEVEL_INF
-#elif	RP_MODULE_CONFIG_LOG_LEVEL == 4
-#define RP_MODULE_LOG_LEVEL		LOG_LEVEL_DBG
-#endif
 #include <logging/log.h>
-LOG_MODULE_REGISTER(RP_MODULE_PREFIX, RP_MODULE_LOG_LEVEL);
+LOG_MODULE_REGISTER(RP_MODULE_PREFIX, CONFIG_RP_SER_LOG_LEVEL);
 
 /**
  * @brief Macro for logging a message with the severity level ERR.

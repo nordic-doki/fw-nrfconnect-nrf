@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd.h>
-#include <at_notif.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_cmd.h>
+#include <modem/at_notif.h>
 #include <ctype.h>
 #include <device.h>
 #include <errno.h>
-#include <modem_info.h>
+#include <modem/modem_info.h>
 #include <net/socket.h>
 #include <stdio.h>
 #include <string.h>

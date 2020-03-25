@@ -7,8 +7,4 @@ Other libraries
    :maxdepth: 1
    :glob:
 
-   ../../include/at_cmd_parser/*
    ../../include/*
-   ../../include/dfu/*
-   ../../include/debug/*
-   ../../include/shell/*

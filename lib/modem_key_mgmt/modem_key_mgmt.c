@@ -7,11 +7,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <zephyr.h>
-#include <at_cmd.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
+#include <modem/at_cmd.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
 #include <bsd_limits.h>
-#include <modem_key_mgmt.h>
+#include <modem/modem_key_mgmt.h>
 
 #define MODEM_KEY_MGMT_OP_LS "AT%CMNG=1"
 #define MODEM_KEY_MGMT_OP_RD "AT%CMNG=2"

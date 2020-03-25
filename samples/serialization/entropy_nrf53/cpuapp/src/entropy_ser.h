@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2020 Nordic Semiconductor ASA
  *
@@ -12,7 +11,7 @@
 
 /**
  * @file
- * @defgroup entropy_ser BLE Entropy driver serialization
+ * @defgroup entropy_ser Entropy driver serialization
  * @{
  * @brief Entropy serialization API.
  */
@@ -28,7 +27,7 @@ extern "C" {
  */
 int entropy_remote_init(void);
 
-/**@brief Function for get entropy from remote driver.
+/**@brief Function for getting entropy value from the remote driver.
  *
  * @param[out] buffer Received entropy data.
  * @param[in] length Requested entropy length.

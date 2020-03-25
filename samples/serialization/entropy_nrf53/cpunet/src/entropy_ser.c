@@ -14,42 +14,28 @@
 
 #include "../../ser_common.h"
 
-#define SERIALIZATION_BUFFER_SIZE 64
-
-#define ENTROPY_INIT_RSP_PARAM_CNT 1
-#define ENTROPY_GET_RSP_PARAM_CNT 2
-
 RP_SER_DEFINE(entropy_ser, struct k_sem, 0, 1000, 0);
 
 static struct device *entropy;
 
-static int rsp_error_code_sent(int err_code)
+static int rsp_error_code_send(int err_code)
 {
 	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
+	CborEncoder encoder;
 	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
-	rp_ser_buf_alloc(entropy_ser, encoder, packet_size);
+	rp_ser_buf_alloc(rsp_buf, entropy_ser, packet_size);
 
-	err = rp_ser_procedure_initialize(&encoder, &container,
-					  ENTROPY_INIT_RSP_PARAM_CNT,
-					  RP_SER_PACKET_TYPE_RSP,
-					  0);
+	err = rp_ser_rsp_init(&rsp_buf, &encoder);
 	if (err) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_int(&container, err_code) != CborNoError) {
+	if (cbor_encode_int(&encoder, err_code) != CborNoError) {
 		return -EINVAL;
 	}
 
-	err = rp_ser_procedure_end(&encoder);
-	if (err) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_rsp_send(&entropy_ser, &encoder);
+	err = rp_ser_rsp_send(&entropy_ser, &rsp_buf, &encoder);
 	if (err) {
 		return -EINVAL;
 	}
@@ -60,34 +46,25 @@ static int rsp_error_code_sent(int err_code)
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
 	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
+	CborEncoder encoder;
 	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
-	rp_ser_buf_alloc(entropy_ser, encoder, packet_size);
+	rp_ser_buf_alloc(rsp_buf, entropy_ser, packet_size);
 
-	err = rp_ser_procedure_initialize(&encoder, &container,
-					  ENTROPY_GET_RSP_PARAM_CNT,
-					  RP_SER_PACKET_TYPE_RSP,
-					  0);
+	err = rp_ser_rsp_init(&rsp_buf, &encoder);
 	if (err) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_int(&container, err_code) != CborNoError) {
+	if (cbor_encode_int(&encoder, err_code) != CborNoError) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_byte_string(&container, data, length) != CborNoError) {
+	if (cbor_encode_byte_string(&encoder, data, length) != CborNoError) {
 		return -EINVAL;
 	}
 
-	err = rp_ser_procedure_end(&encoder);
-	if (err) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_rsp_send(&entropy_ser, &encoder);
+	err = rp_ser_rsp_send(&entropy_ser, &rsp_buf, &encoder);
 	if (err) {
 		return -EINVAL;
 	}
@@ -95,19 +72,18 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-
 static rp_err_t entropy_init_handler(CborValue *it)
 {
 	int err;
 
 	entropy = device_get_binding(CONFIG_ENTROPY_NAME);
 	if (!entropy) {
-		rsp_error_code_sent(-EINVAL);
+		rsp_error_code_send(-EINVAL);
 
 		return RP_ERROR_INTERNAL;
 	}
 
-	err = rsp_error_code_sent(0);
+	err = rsp_error_code_send(0);
 	if (err) {
 		return RP_ERROR_INTERNAL;
 	}
@@ -156,7 +132,6 @@ static int serialization_init(struct device *dev)
 
 	return 0;
 }
-
 
 RP_SER_CMD_DECODER(entropy_ser, entropy_init, SER_COMMAND_ENTROPY_INIT,
 		   entropy_init_handler);

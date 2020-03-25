@@ -11,11 +11,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <device.h>
-#include <lte_lc.h>
-#include <at_cmd.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
-#include <at_notif.h>
+#include <modem/lte_lc.h>
+#include <modem/at_cmd.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
+#include <modem/at_notif.h>
 #include <logging/log.h>
 
 LOG_MODULE_REGISTER(lte_lc, CONFIG_LTE_LINK_CONTROL_LOG_LEVEL);

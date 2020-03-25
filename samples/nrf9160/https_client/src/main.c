@@ -8,12 +8,12 @@
 #include <zephyr.h>
 #include <stdlib.h>
 #include <net/socket.h>
-#include <net/bsdlib.h>
+#include <modem/bsdlib.h>
 #include <net/tls_credentials.h>
-#include <lte_lc.h>
-#include <at_cmd.h>
-#include <at_notif.h>
-#include <modem_key_mgmt.h>
+#include <modem/lte_lc.h>
+#include <modem/at_cmd.h>
+#include <modem/at_notif.h>
+#include <modem/modem_key_mgmt.h>
 
 #define HTTPS_PORT 443
 

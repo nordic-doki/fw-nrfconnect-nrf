@@ -36,7 +36,10 @@ enum cloud_event_type {
 	CLOUD_EVT_DATA_RECEIVED,
 	CLOUD_EVT_PAIR_REQUEST,
 	CLOUD_EVT_PAIR_DONE,
+	CLOUD_EVT_FOTA_START,
 	CLOUD_EVT_FOTA_DONE,
+	CLOUD_EVT_FOTA_ERASE_PENDING,
+	CLOUD_EVT_FOTA_ERASE_DONE,
 	CLOUD_EVT_COUNT
 };
 
@@ -372,6 +375,22 @@ static inline int cloud_user_data_set(struct cloud_backend *const backend,
 	}
 
 	return backend->api->user_data_set(backend, user_data);
+}
+
+/**
+ * @brief Calls the user-provided event handler with event data.
+ *
+ * @param backend	Pointer to cloud backend.
+ * @param evt		Pointer to event data.
+ * @param user_data	Pointer to user-defined data.
+ */
+static inline void cloud_notify_event(struct cloud_backend *backend,
+				      struct cloud_event *evt,
+				      void *user_data)
+{
+	if (backend->config->handler) {
+		backend->config->handler(backend, evt, user_data);
+	}
 }
 
 /**

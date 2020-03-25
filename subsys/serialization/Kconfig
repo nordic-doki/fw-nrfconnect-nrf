@@ -10,7 +10,7 @@ if RP_SERIALIZATION
 
 config RP_OS_RSP_WAIT_TIME
 	int "Remote procedure response wait time"
-	default 1500
+	default 5000
 	help
 	  Remote procedure wait for response maximum time in miliseconds
 
@@ -39,6 +39,10 @@ config RP_TRANS_PRMSG_RX_PRIORITY
 	help
 	  Priority of the thread that is responsible for receiving incoming
 	  messages from rpmsg.
+
+module = RP_SER
+module-str = RP_SER
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
 endif # RP_SERIALIZATION
 

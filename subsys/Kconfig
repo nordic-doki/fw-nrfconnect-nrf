@@ -31,4 +31,6 @@ rsource "shell/Kconfig"
 
 rsource "mpsl/Kconfig"
 
+rsource "partition_manager/Kconfig"
+
 rsource "serialization/Kconfig"

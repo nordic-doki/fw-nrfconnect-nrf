@@ -208,6 +208,7 @@ static int get_job_execution(struct mqtt_client *const client,
 static int job_update_accepted(struct mqtt_client *const client,
 			       u32_t payload_len)
 {
+	int sec_tag = -1;
 	int err = get_published_payload(client, payload_buf, payload_len);
 
 	if (err) {
@@ -234,7 +235,11 @@ static int job_update_accepted(struct mqtt_client *const client,
 		execution_state = AWS_JOBS_IN_PROGRESS;
 		LOG_INF("Start downloading firmware from %s/%s",
 			log_strdup(hostname), log_strdup(file_path));
-		err = fota_download_start(hostname, file_path);
+#if defined(DOWNLOAD_CLIENT_TLS)
+		sec_tag = CONFIG_AWS_FOTA_DOWNLOAD_SECURITY_TAG
+#endif
+
+		err = fota_download_start(hostname, file_path, sec_tag);
 		if (err) {
 			LOG_ERR("Error (%d) when trying to start firmware "
 				"download", err);
@@ -318,7 +323,13 @@ static int on_publish_evt(struct mqtt_client *const client,
 	bool doc_update_rejected =
 		aws_jobs_cmp(update_topic, topic, topic_len, "rejected");
 
-	LOG_DBG("Received topic: %s", log_strdup(topic));
+#if defined(CONFIG_AWS_FOTA_LOG_LEVEL_DBG)
+	char debug_log[topic_len + 1];
+
+	memcpy(debug_log, topic, topic_len);
+	debug_log[topic_len] = '\0';
+	LOG_DBG("Received topic: %s", log_strdup(debug_log));
+#endif
 
 	if (is_notify_next_topic || is_get_next_topic || is_get_accepted) {
 		LOG_INF("Checking for an available job");
@@ -329,8 +340,10 @@ static int on_publish_evt(struct mqtt_client *const client,
 		LOG_ERR("Job document update was rejected");
 		return job_update_rejected(client, payload_len);
 	}
-	LOG_INF("received an unhandled MQTT publish event on topic: %s",
-		log_strdup(topic));
+#if defined(CONFIG_AWS_FOTA_LOG_LEVEL_DBG)
+	LOG_DBG("received an unhandled MQTT publish event on topic: %s",
+		log_strdup(debug_log));
+#endif
 
 	return 1;
 }

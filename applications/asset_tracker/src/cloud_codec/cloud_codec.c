@@ -12,11 +12,15 @@
 #include <zephyr.h>
 #include <zephyr/types.h>
 #include <net/cloud.h>
+#if defined(CONFIG_BSD_LIBRARY)
+#include <modem/modem_info.h>
+#endif /* CONFIG_BSD_LIBRARY */
 
 #include "cJSON.h"
 #include "cJSON_os.h"
 #include "cloud_codec.h"
 
+#include "service_info.h"
 #include "env_sensors.h"
 
 #include <logging/log.h>
@@ -336,27 +340,145 @@ int cloud_encode_data(const struct cloud_channel_data *channel,
 	return 0;
 }
 
-int cloud_encode_digital_twin_data(const struct cloud_channel_data *channel,
+int cloud_encode_env_sensors_data(const env_sensor_data_t *sensor_data,
+				  struct cloud_msg *output)
+{
+	__ASSERT_NO_MSG(sensor_data != NULL);
+	__ASSERT_NO_MSG(output != NULL);
+
+	char buf[6];
+	u8_t len;
+	struct cloud_channel_data cloud_sensor;
+
+	switch (sensor_data->type) {
+	case ENV_SENSOR_TEMPERATURE:
+		cloud_sensor.type = CLOUD_CHANNEL_TEMP;
+		break;
+
+	case ENV_SENSOR_HUMIDITY:
+		cloud_sensor.type = CLOUD_CHANNEL_HUMID;
+		break;
+
+	case ENV_SENSOR_AIR_PRESSURE:
+		cloud_sensor.type = CLOUD_CHANNEL_AIR_PRESS;
+		break;
+
+	case ENV_SENSOR_AIR_QUALITY:
+		cloud_sensor.type = CLOUD_CHANNEL_AIR_QUAL;
+		break;
+
+	default:
+		return -1;
+	}
+
+	len = snprintf(buf, sizeof(buf), "%.1f",
+		sensor_data->value);
+	cloud_sensor.data.buf = buf;
+	cloud_sensor.data.len = len;
+
+	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
+}
+
+int cloud_encode_motion_data(const motion_data_t *motion_data,
+				  struct cloud_msg *output)
+{
+	__ASSERT_NO_MSG(motion_data != NULL);
+	__ASSERT_NO_MSG(output != NULL);
+
+	struct cloud_channel_data cloud_sensor;
+
+	cloud_sensor.type = CLOUD_CHANNEL_FLIP;
+
+	switch (motion_data->orientation) {
+	case MOTION_ORIENTATION_NORMAL:
+		cloud_sensor.data.buf = "NORMAL";
+		break;
+	case MOTION_ORIENTATION_UPSIDE_DOWN:
+		cloud_sensor.data.buf = "UPSIDE_DOWN";
+		break;
+	default:
+		return -1;
+	}
+
+	cloud_sensor.data.len = sizeof(cloud_sensor.data.buf) - 1;
+
+	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
+
+}
+
+#if CONFIG_LIGHT_SENSOR
+/* 4 32-bit ints, 3 spaces, NULL */
+#define LIGHT_SENSOR_DATA_STRING_MAX_LEN ((4 * 11) + 3 + 1)
+#define LIGHT_SENSOR_DATA_NO_UPDATE (-1)
+int cloud_encode_light_sensor_data(const struct light_sensor_data *sensor_data,
 				   struct cloud_msg *output)
 {
-	int ret = 0;
-	char *buffer;
+	char buf[LIGHT_SENSOR_DATA_STRING_MAX_LEN];
+	u8_t len;
+	struct cloud_channel_data cloud_sensor;
+	struct light_sensor_data send = { .red = LIGHT_SENSOR_DATA_NO_UPDATE,
+					  .green = LIGHT_SENSOR_DATA_NO_UPDATE,
+					  .blue = LIGHT_SENSOR_DATA_NO_UPDATE,
+					  .ir = LIGHT_SENSOR_DATA_NO_UPDATE };
 
-	__ASSERT_NO_MSG(channel != NULL);
-	__ASSERT_NO_MSG(channel->data.buf != NULL);
-	__ASSERT_NO_MSG(channel->data.len != 0);
+	if ((sensor_data == NULL) || (output == NULL)) {
+		return -EINVAL;
+	}
+
+	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_RED, sensor_data->red)) {
+		send.red = sensor_data->red;
+	}
+
+	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_GREEN,
+				  sensor_data->green)) {
+		send.green = sensor_data->green;
+	}
+
+	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_BLUE,
+				  sensor_data->blue)) {
+		send.blue = sensor_data->blue;
+	}
+
+	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_IR, sensor_data->ir)) {
+		send.ir = sensor_data->ir;
+	}
+
+	len = snprintf(buf, sizeof(buf), "%d %d %d %d", send.red, send.green,
+		       send.blue, send.ir);
+
+	cloud_sensor.data.buf = buf;
+	cloud_sensor.data.len = len;
+	cloud_sensor.type = CLOUD_CHANNEL_LIGHT_SENSOR;
+
+	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
+}
+#endif /* CONFIG_LIGHT_SENSOR */
+
+int cloud_encode_device_status_data(
+	void *modem_param,
+	const char *const ui[], const u32_t ui_count,
+	const char *const fota[], const u32_t fota_count,
+	const u16_t fota_version,
+	struct cloud_msg *output)
+{
+	__ASSERT_NO_MSG((ui != NULL) || !ui_count);
+	__ASSERT_NO_MSG((fota != NULL) || !fota_count);
 	__ASSERT_NO_MSG(output != NULL);
 
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *device_obj = cJSON_CreateObject();
 	char dev_str[] = CLOUD_CHANNEL_STR_DEVICE_INFO;
 	const char *channel_type;
+	int ret = 0;
 
-	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL) {
+	if (root_obj == NULL || state_obj == NULL ||
+	    reported_obj == NULL || device_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
+		cJSON_Delete(device_obj);
 		return -ENOMEM;
 	}
 
@@ -367,36 +489,60 @@ int cloud_encode_digital_twin_data(const struct cloud_channel_data *channel,
 	 * the size of the digital twin document if the "DEVICE" is not
 	 * deleted at the same time.
 	 */
-	if (channel->type == CLOUD_CHANNEL_DEVICE_INFO) {
-		cJSON *dummy_obj = cJSON_CreateNull();
-		if (dummy_obj == NULL) {
-			/* Dummy creation failed, but we'll let it do so
-			 * silently as it's not a functionally critical error.
-			 */
-		} else {
-			ret += json_add_obj(reported_obj, dev_str, dummy_obj);
-		}
+	cJSON *dummy_obj = cJSON_CreateNull();
 
-		/* Convert to lowercase for shadow */
-		for (int i = 0; dev_str[i]; ++i) {
-			dev_str[i] = tolower(dev_str[i]);
-		}
-		channel_type = dev_str;
+	if (dummy_obj == NULL) {
+		/* Dummy creation failed, but we'll let it do so
+		 * silently as it's not a functionally critical error.
+		 */
 	} else {
-		channel_type = channel_type_str[channel->type];
+		ret += json_add_obj(reported_obj, dev_str, dummy_obj);
 	}
 
-	ret += json_add_obj(reported_obj, channel_type,
-			   (cJSON *)channel->data.buf);
-	ret += json_add_obj(state_obj, "reported", reported_obj);
-	ret += json_add_obj(root_obj, "state", state_obj);
+	/* Convert to lowercase for shadow */
+	for (int i = 0; dev_str[i]; ++i) {
+		dev_str[i] = tolower(dev_str[i]);
+	}
+	channel_type = dev_str;
+
+	size_t item_cnt = 0;
+
+#ifdef CONFIG_MODEM_INFO
+	if (modem_param) {
+		int val;
+
+		val = modem_info_json_object_encode((struct modem_param_info *)
+			modem_param, device_obj);
+		if (val > 0) {
+			item_cnt = (size_t)val;
+		}
+	}
+#endif
+
+	if (service_info_json_object_encode(ui, ui_count,
+					    fota, fota_count,
+					    fota_version,
+					    device_obj) == 0) {
+		++item_cnt;
+	}
+
+	if (item_cnt != 0) {
+		ret += json_add_obj(reported_obj, channel_type, device_obj);
+		ret += json_add_obj(state_obj, "reported", reported_obj);
+		ret += json_add_obj(root_obj, "state", state_obj);
+	} else {
+		ret = -ECHILD;
+	}
 
 	if (ret != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
+		cJSON_Delete(device_obj);
 		return -EAGAIN;
 	}
+
+	char *buffer;
 
 	buffer = cJSON_PrintUnformatted(root_obj);
 	cJSON_Delete(root_obj);
@@ -725,119 +871,6 @@ int cloud_decode_init(cloud_cmd_cb_t cb)
 
 	return 0;
 }
-
-int cloud_encode_env_sensors_data(const env_sensor_data_t *sensor_data,
-				  struct cloud_msg *output)
-{
-	__ASSERT_NO_MSG(sensor_data != NULL);
-	__ASSERT_NO_MSG(output != NULL);
-
-	char buf[6];
-	u8_t len;
-	struct cloud_channel_data cloud_sensor;
-
-	switch (sensor_data->type) {
-	case ENV_SENSOR_TEMPERATURE:
-		cloud_sensor.type = CLOUD_CHANNEL_TEMP;
-		break;
-
-	case ENV_SENSOR_HUMIDITY:
-		cloud_sensor.type = CLOUD_CHANNEL_HUMID;
-		break;
-
-	case ENV_SENSOR_AIR_PRESSURE:
-		cloud_sensor.type = CLOUD_CHANNEL_AIR_PRESS;
-		break;
-
-	case ENV_SENSOR_AIR_QUALITY:
-		cloud_sensor.type = CLOUD_CHANNEL_AIR_QUAL;
-		break;
-
-	default:
-		return -1;
-	}
-
-	len = snprintf(buf, sizeof(buf), "%.1f",
-		sensor_data->value);
-	cloud_sensor.data.buf = buf;
-	cloud_sensor.data.len = len;
-
-	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
-}
-
-int cloud_encode_motion_data(const motion_data_t *motion_data,
-				  struct cloud_msg *output)
-{
-	__ASSERT_NO_MSG(motion_data != NULL);
-	__ASSERT_NO_MSG(output != NULL);
-
-	struct cloud_channel_data cloud_sensor;
-
-	cloud_sensor.type = CLOUD_CHANNEL_FLIP;
-
-	switch (motion_data->orientation) {
-	case MOTION_ORIENTATION_NORMAL:
-		cloud_sensor.data.buf = "NORMAL";
-		break;
-	case MOTION_ORIENTATION_UPSIDE_DOWN:
-		cloud_sensor.data.buf = "UPSIDE_DOWN";
-		break;
-	default:
-		return -1;
-	}
-
-	cloud_sensor.data.len = sizeof(cloud_sensor.data.buf) - 1;
-
-	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
-
-}
-#if CONFIG_LIGHT_SENSOR
-/* 4 32-bit ints, 3 spaces, NULL */
-#define LIGHT_SENSOR_DATA_STRING_MAX_LEN ((4 * 11) + 3 + 1)
-#define LIGHT_SENSOR_DATA_NO_UPDATE (-1)
-int cloud_encode_light_sensor_data(const struct light_sensor_data *sensor_data,
-				   struct cloud_msg *output)
-{
-	char buf[LIGHT_SENSOR_DATA_STRING_MAX_LEN];
-	u8_t len;
-	struct cloud_channel_data cloud_sensor;
-	struct light_sensor_data send = { .red = LIGHT_SENSOR_DATA_NO_UPDATE,
-					  .green = LIGHT_SENSOR_DATA_NO_UPDATE,
-					  .blue = LIGHT_SENSOR_DATA_NO_UPDATE,
-					  .ir = LIGHT_SENSOR_DATA_NO_UPDATE };
-
-	if ((sensor_data == NULL) || (output == NULL)) {
-		return -EINVAL;
-	}
-
-	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_RED, sensor_data->red)) {
-		send.red = sensor_data->red;
-	}
-
-	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_GREEN,
-				  sensor_data->green)) {
-		send.green = sensor_data->green;
-	}
-
-	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_BLUE,
-				  sensor_data->blue)) {
-		send.blue = sensor_data->blue;
-	}
-
-	if (cloud_is_send_allowed(CLOUD_CHANNEL_LIGHT_IR, sensor_data->ir)) {
-		send.ir = sensor_data->ir;
-	}
-
-	len = snprintf(buf, sizeof(buf), "%d %d %d %d", send.red, send.green,
-		       send.blue, send.ir);
-
-	cloud_sensor.data.buf = buf;
-	cloud_sensor.data.len = len;
-	cloud_sensor.type = CLOUD_CHANNEL_LIGHT_SENSOR;
-
-	return cloud_encode_data(&cloud_sensor, CLOUD_CMD_GROUP_DATA, output);
-}
-#endif /* CONFIG_LIGHT_SENSOR */
 
 static int sensor_chan_cfg_set_item(struct sensor_chan_cfg *const cfg,
 				  const enum sensor_chan_cfg_item_type type,

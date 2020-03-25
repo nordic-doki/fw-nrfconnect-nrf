@@ -5,4 +5,4 @@ tests:
   test_build:
     build_only: true
     build_on_all: true
-    platform_whitelist: nrf5340_dk_nrf5340_cpuapp nrf5340_dk_nrf5340_cpuappns
+    platform_whitelist: nrf5340_dk_nrf5340_cpuapp

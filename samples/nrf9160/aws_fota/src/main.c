@@ -7,12 +7,12 @@
 #include <zephyr.h>
 #include <stdio.h>
 #include <bsd.h>
-#include <lte_lc.h>
-#include <at_cmd.h>
-#include <at_notif.h>
+#include <modem/lte_lc.h>
+#include <modem/at_cmd.h>
+#include <modem/at_notif.h>
 #include <net/mqtt.h>
 #include <net/socket.h>
-#include <net/bsdlib.h>
+#include <modem/bsdlib.h>
 #include <net/aws_jobs.h>
 #include <net/aws_fota.h>
 #include <dfu/mcuboot.h>
@@ -28,7 +28,7 @@ BUILD_ASSERT_MSG(!IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT),
 #if defined(CONFIG_PROVISION_CERTIFICATES)
 #include "certificates.h"
 #if defined(CONFIG_MODEM_KEY_MGMT)
-#include <modem_key_mgmt.h>
+#include <modem/modem_key_mgmt.h>
 #endif
 #endif
 

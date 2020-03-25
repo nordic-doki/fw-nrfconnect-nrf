@@ -11,10 +11,6 @@
 
 #include "../../ser_common.h"
 
-#define SERIALIZATION_BUFFER_SIZE 64
-
-#define ENTROPY_GET_CMD_PARAM_CNT 1
-
 struct entropy_rsp {
 	u8_t *buffer;
 	u16_t length;
@@ -70,25 +66,18 @@ static rp_err_t entropy_get_rsp(CborValue *it)
 int entropy_remote_init(void)
 {
 	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
+	CborEncoder encoder;
 	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
-	rp_ser_buf_alloc(entropy_ser, encoder, packet_size);
+	rp_ser_buf_alloc(cmd_buf, entropy_ser, packet_size);
 
-	err = rp_ser_procedure_initialize(&encoder, &container, 0,
-					  RP_SER_PACKET_TYPE_CMD,
-					  SER_COMMAND_ENTROPY_INIT);
+	err = rp_ser_cmd_init(&cmd_buf, &encoder, SER_COMMAND_ENTROPY_INIT);
 	if (err) {
 		return -EINVAL;
 	}
 
-	err = rp_ser_procedure_end(&encoder);
-	if (err) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_cmd_send(&entropy_ser, &encoder, rsp_error_code_handle);
+	err = rp_ser_cmd_send(&entropy_ser, &cmd_buf,
+			      &encoder, rsp_error_code_handle);
 	if (err) {
 		return -EINVAL;
 	}
@@ -99,8 +88,7 @@ int entropy_remote_init(void)
 int entropy_remote_get(u8_t *buffer, u16_t length)
 {
 	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
+	CborEncoder encoder;
 	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
 	if (!buffer || length < 1) {
@@ -110,26 +98,19 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 	rsp_data.buffer = buffer;
 	rsp_data.length = length;
 
-	rp_ser_buf_alloc(entropy_ser, encoder, packet_size);
+	rp_ser_buf_alloc(cmd_buf, entropy_ser, packet_size);
 
-	err = rp_ser_procedure_initialize(&encoder, &container,
-					  ENTROPY_GET_CMD_PARAM_CNT,
-					  RP_SER_PACKET_TYPE_CMD,
-					  SER_COMMAND_ENTROPY_GET);
+	err = rp_ser_cmd_init(&cmd_buf, &encoder, SER_COMMAND_ENTROPY_GET);
 	if (err) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_int(&container, length) != CborNoError) {
+	if (cbor_encode_int(&encoder, length) != CborNoError) {
 		return -EINVAL;
 	}
 
-	err = rp_ser_procedure_end(&encoder);
-	if (err) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_cmd_send(&entropy_ser, &encoder, entropy_get_rsp);
+	err = rp_ser_cmd_send(&entropy_ser, &cmd_buf,
+			      &encoder, entropy_get_rsp);
 	if (err) {
 		return -EINVAL;
 	}

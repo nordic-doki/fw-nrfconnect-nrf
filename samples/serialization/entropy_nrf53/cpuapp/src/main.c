@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-
-#include <drivers/entropy.h>
 #include <zephyr.h>
 
 #include <rp_ser.h>
@@ -35,7 +33,7 @@ void main(void)
 			continue;
 		}
 
-		for (int i = 0; i < BUFFER_LENGTH-1; i++) {
+		for (int i = 0; i < BUFFER_LENGTH; i++) {
 			printk("  0x%02x", buffer[i]);
 		}
 

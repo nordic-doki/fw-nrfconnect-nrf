@@ -10,13 +10,13 @@
 #include <stdbool.h>
 #include <zephyr.h>
 #include <string.h>
-#include <at_cmd.h>
-#include <at_notif.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
+#include <modem/at_cmd.h>
+#include <modem/at_notif.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
 #include <bsd.h>
-#include <lte_lc.h>
-#include <net/bsdlib.h>
+#include <modem/lte_lc.h>
+#include <modem/bsdlib.h>
 #include <net/download_client.h>
 #include <power/reboot.h>
 #include <sys/util.h>
@@ -25,7 +25,7 @@
 #include <logging/log.h>
 #include <errno.h>
 #include <nrf_errno.h>
-#include <modem_key_mgmt.h>
+#include <modem/modem_key_mgmt.h>
 
 /* NVS-related defines */
 

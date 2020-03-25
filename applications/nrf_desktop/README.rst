@@ -284,6 +284,51 @@ To use the nRF Desktop project with your custom board:
    Some options have dependencies that might not be needed when these options are disabled.
    For example, when the LEDs module is disabled, the PWM driver is not needed.
 
+Flash memory layout
+===================
+
+Depending on whether the bootloader is enabled, the partition layout on the flash memory is set by defining either:
+
+* `Memory layout in DTS`_ (bootloader is not enabled)
+* `Memory layout in partition manager`_ (bootloader is enabled)
+
+The set of required partitions differs depending on the configuration:
+
+* There must be at least one partition where the code is stored.
+* There must be one partition to store settings.
+* The bootloader, if enabled, will add additional partitions to the set.
+
+
+Memory layout in DTS
+--------------------
+
+When using the flash memory layout in the DTS files, define the ``partitions`` child node in the flash device node (``&flash0``).
+
+Since the nRF Desktop project uses the partition manager when the bootloader is present, the partition definition from the DTS files is valid only for configurations without the bootloader.
+
+.. note::
+    If you wish to change the default flash memory layout of the board without editing board-specific files, edit the DTS overlay file.
+    The nRF Desktop project automatically adds the overlay file if the ``dts.overlay`` file is present in the project's board configuration directory.
+    See more in the `Board configuration`_ section.
+
+.. warning::
+    By default, Zephyr does not use the code partition defined in the DTS files.
+    It is only used if `:option:`CONFIG_USE_DT_CODE_PARTITION` is enabled.
+    If this option is disabled, the code is loaded at the address defined by :option:`CONFIG_FLASH_LOAD_OFFSET` and can spawn for :option:`CONFIG_FLASH_LOAD_SIZE` (or for the whole flash if the load size is set to zero).
+
+Since the nRF Desktop project depends on the DTS layout only when bootloader is not used, only the settings partition is relevant and other partitions are ignored.
+
+For more information about how to configure the flash memory layout in the DTS files, see :ref:`flash_partitions`.
+
+Memory layout in partition manager
+----------------------------------
+
+When the bootloader is enabled, the nRF Desktop project uses the partition manager for the layout configuration of the flash memory.
+The project uses the static configuration of partitions.
+Add the ``pm_static_${CMAKE_BUILD_TYPE}.yml`` partition manager configuration file to the project's board configuration directory to use this configuration.
+
+For more information about how to configure the flash memory layout using the partition manager, see :ref:`partition_manager`.
+
 Requirements
 ************
 
@@ -593,10 +638,36 @@ This application uses its own set of internal modules.
 For more information about each application module and its configuration details, see the following pages:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
-   doc/hw_interface.rst
-   doc/modules.rst
+   doc/battery_charger.rst
+   doc/battery_meas.rst
+   doc/board.rst
+   doc/buttons.rst
+   doc/buttons_sim.rst
+   doc/click_detector.rst
+   doc/dev_descr.rst
+   doc/motion.rst
+   doc/passkey.rst
+   doc/selector.rst
+   doc/wheel.rst
+   doc/leds.rst
+   doc/bas.rst
+   doc/ble_adv.rst
+   doc/ble_bond.rst
+   doc/ble_discovery.rst
+   doc/ble_latency.rst
+   doc/ble_scan.rst
+   doc/ble_state.rst
+   doc/config_channel.rst
+   doc/fn_keys.rst
+   doc/hid_forward.rst
+   doc/hid_state.rst
+   doc/hids.rst
+   doc/led_state.rst
+   doc/power_manager.rst
+   doc/usb_state.rst
+   doc/watchdog.rst
 
 
 .. |nRF_Desktop_confirmation_effect| replace:: After the confirmation, Bluetooth advertising using a new local identity is started.

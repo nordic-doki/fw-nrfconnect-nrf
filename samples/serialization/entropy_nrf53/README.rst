@@ -26,7 +26,7 @@ look for function decoders in decoders table and call it after that the Network 
 Application core
 ================
 
-The application core runs a serialized application, where the Entropy drivers functions and asynchronous events are replaced by encoders and decoders.
+The application core runs a simple application, where the Entropy drivers functions and asynchronous events are replaced by virtual implementation using Remote Procedure Serialization library.
 For the needs of the Entropy driver, this application uses only :cpp:func:`entropy_remote_init` to initialize the Network core  Entropy driver and :cpp:func:`entropy_remote_get` to gets entropy data.
 
 Requirements
