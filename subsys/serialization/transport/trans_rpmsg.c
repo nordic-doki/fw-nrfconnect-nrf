@@ -62,28 +62,20 @@ int rp_trans_init(rp_trans_receive_handler callback, rp_trans_filter filter)
 	return translate_error(result);
 }
 
-static void endpoint_thread(void *p1, void *p2, void *p3)
+void endpoint_work(struct k_work *item)
 {
 	uint32_t len;
-	struct rp_trans_endpoint *endpoint = (struct rp_trans_endpoint *)p1;
+	struct rp_trans_endpoint *endpoint = CONTAINER_OF(item, struct rp_trans_endpoint, work);
 
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
-
-	while (true) {
-		k_sem_take(&endpoint->input_sem, K_FOREVER);
-		if (!endpoint->running) {
-			break;
-		}
-		k_mutex_lock(&endpoint->mutex, K_FOREVER);
-		len = (uint32_t)atomic_set(&endpoint->input_length, (atomic_val_t)0);
-		if (len & FLAG_FILTERED) {
-			receive_handler(endpoint, NULL, len ^ FLAG_FILTERED);
-		} else {
-			receive_handler(endpoint, endpoint->input_buffer, len);
-		}
-		k_mutex_unlock(&endpoint->mutex);
+	k_mutex_lock(&endpoint->mutex, K_FOREVER);
+	len = (uint32_t)atomic_set(&endpoint->input_length, (atomic_val_t)0);
+	if (len & FLAG_FILTERED) {
+		rp_trans_release_buffer(endpoint);
+		receive_handler(endpoint, NULL, len ^ FLAG_FILTERED);
+	} else {
+		receive_handler(endpoint, endpoint->input_buffer, len);
 	}
+	k_mutex_unlock(&endpoint->mutex);
 }
 
 static void event_handler(struct rp_ll_endpoint *ll_ep,
@@ -96,7 +88,7 @@ static void event_handler(struct rp_ll_endpoint *ll_ep,
 	if (event == RP_LL_EVENT_CONNECTED) {
 		k_sem_give(&endpoint->input_sem);
 		return;
-	} else if (event != RP_LL_EVENT_DATA) {
+	} else if (event != RP_LL_EVENT_DATA || length == 0) {
 		return;
 	}
 
@@ -123,19 +115,24 @@ static void event_handler(struct rp_ll_endpoint *ll_ep,
 		 * then hang on mutex. This allows user thread to execute and consume
 		 * data.
 		 */
-		k_sem_give(&endpoint->input_sem);
-		k_sem_give(&endpoint->input_sem);
 		/* Wait when decoding is done to safely return buffers
 		 * to caller.
 		 */
-		k_sem_take(&endpoint->done_sem, K_FOREVER);
 		endpoint->wait_for_done = false;
 	} else {
 		/* TODO: description*/
 		atomic_set(&endpoint->input_length, (atomic_val_t)filtered | (atomic_val_t)FLAG_FILTERED);
-		k_sem_give(&endpoint->input_sem);
-		k_sem_give(&endpoint->input_sem);
 		endpoint->wait_for_done = true;
+	}
+
+	k_sem_give(&endpoint->input_sem);
+	if (!endpoint->reading) {
+		k_work_submit(&endpoint->work);
+	}
+	endpoint->reading = false;
+	
+	if (!filtered) {
+		k_sem_take(&endpoint->done_sem, K_FOREVER);
 	}
 }
 
@@ -147,12 +144,13 @@ int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 	size_t stack_size = endpoint->stack_size;
 	k_thread_stack_t *stack = endpoint->stack;
 
-	endpoint->running = true;
+	endpoint->input_length = ATOMIC_INIT(0);
+	endpoint->reading = false;
 	endpoint->wait_for_done = false;
 
-	k_sem_init(&endpoint->input_sem, 0, 2);
-	k_sem_init(&endpoint->done_sem, 0, 1);
 	k_mutex_init(&endpoint->mutex);
+	k_sem_init(&endpoint->input_sem, 0, 1);
+	k_sem_init(&endpoint->done_sem, 0, 1);
 
 	result = rp_ll_endpoint_init(&endpoint->ll_ep, endpoint_number,
 		event_handler, NULL);
@@ -163,8 +161,8 @@ int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 
 	k_sem_take(&endpoint->input_sem, K_FOREVER);
 
-	k_thread_create(&endpoint->thread, stack, stack_size, endpoint_thread,
-		endpoint, NULL, NULL, prio, 0, K_NO_WAIT);
+	k_work_q_start(&endpoint->work_queue, stack, stack_size, prio);
+	k_work_init(&endpoint->work, endpoint_work);
 
 	return RP_SUCCESS;
 }
@@ -192,11 +190,13 @@ int rp_trans_read(struct rp_trans_endpoint *endpoint, const uint8_t **buf)
 	uint32_t len;
 
 	do {
+		endpoint->reading = true;
 		k_sem_take(&endpoint->input_sem, K_FOREVER);
 		len = (uint32_t)atomic_set(&endpoint->input_length, (atomic_val_t)0);
 	} while (len == 0);
 
 	if (len & FLAG_FILTERED) {
+		rp_trans_release_buffer(endpoint);
 		*buf = NULL;
 		len ^= FLAG_FILTERED;
 	} else {

@@ -4,7 +4,12 @@
 #if defined(CONFIG_RP_SER_FORCE_EVENT_ACK) || defined(RP_TRANS_REQUIRE_EVENT_ACK)
 #define USE_EVENT_ACK 1
 #else
-#define USE_EVENT_ACK 0
+#define USE_EVENT_ACK 1
+#endif
+
+#define FILTERED_RESPONSE 1
+#if USE_EVENT_ACK
+#define FILTERED_ACK 2
 #endif
 
 struct rp_trans_endpoint;
@@ -47,19 +52,24 @@ static void rp_trans_rx_callback(struct rpser_endpoint *ep, u8_t* buf, size_t le
 }
 
 // called from endpoint thread or loop waiting for response
-void handle_packet(u8_t* data, size_t length)
+void handle_packet(u8_t* data, size_t length) // TODO: merge with rp_trans_rx_callback
 {
-        packet_type type = data[0];
+        packet_type type;
+
+	if (data == NULL) {
+#if USE_EVENT_ACK
+		__ASSERT(length == FILTERED_ACK, "Invalid response");
+		ep->waiting_for_ack = false;
+#else
+		__ASSERT(0, "Invalid response");
+#endif
+	}
+ 
+        type = data[0];
         // We get response - this kind of packet should be handled before
         __ASSERT(type != PACKET_TYPE_RESPONSE, "Response packet without any call");
- 
+
 #if USE_EVENT_ACK
-        // This contition may only be true in endpoint thread (maybe add assert?)
-        if (type == PACKET_TYPE_ACK) {
-                ep->waiting_for_ack = false;
-                return;
-        }
- 
         // If we are executing command then the other end is waiting for
         // response, so sending notifications and commands is available again now.
         bool prev_wait_for_ack = ep->waiting_for_ack;
@@ -92,52 +102,46 @@ decoder_old_state_t set_decoder(struct rpser_endpoint *ep, rp_ser_resp_decoder d
 	return state;
 }
 
-#define FILTER_FLAG_RESPONSE_DECODED (1 << 0)
-#define FILTER_FLAG_ACK_RECEIVED (1 << 1)
 
-bool trans_filter(struct rp_trans_endpoint *endpoint, const uint8_t *buf, size_t length, uint8_t *flags)
+bool trans_filter(struct rp_trans_endpoint *endpoint, const uint8_t *buf, size_t length)
 {
-	if (length == 0) {
-		return false;
-	}
 	switch (buf[0])
 	{
 	case PACKET_TYPE_RESPONSE:
 		if (endpoint->decoder) {
 			endpoint->decoder(buf, length);
-			flags = FILTER_FLAG_RESPONSE_DECODED;
-			return false;
+			endpoint->decoder = NULL;
+			return FILTERED_RESPONSE;
 		}
 		break;
 
+#if USE_EVENT_ACK
 	case PACKET_TYPE_ACK:
-		flags = FILTER_FLAG_ACK_RECEIVED;
-		return false;
+		return FILTERED_ACK;
+#endif
 	
 	default:
 		break;
 	}
-	return true;
+	return 0;
 }
 
 // Call after send of command to wait for response
 int wait_for_response(struct rpser_endpoint *ep, uint8_t **out_packet)
 {
 	uint8_t *packet;
-	uint8_t flags;
 	int packet_length;
-	packet_type type;
 
 	do {
 		// Wait for something from rx callback
-		packet_length = rp_trans_read(&ep->trans_ep, &packet, flags);
-		if (flags & FILTER_FLAG_ACK_RECEIVED) {
-			// TODO: Report invalid state
-		}
-		if (flags & FILTER_FLAG_RESPONSE_DECODED) {
-			*out_packet = NULL;
+		packet_length = rp_trans_read(&ep->trans_ep, &packet);
+
+		if (packet == NULL)
+		{
+			__ASSERT(packet_length == FILTERED_RESPONSE, "Invalid response");
 			return 0;
 		}
+
 		switch (packet[0])
 		{
 		case PACKET_TYPE_RESPONSE:
@@ -151,24 +155,13 @@ int wait_for_response(struct rpser_endpoint *ep, uint8_t **out_packet)
 			handle_packet(ep, packet, packet_length);
 			break;
 		default:
-			// TODO: Invalid State Error Log
-			rp_trans_read_end();
+			__ASSERT(0, "Invalid response");
 			break;
 		}
 	} while (true);
 }
 
 #if USE_EVENT_ACK
-
-int event_ack_filter(struct rp_trans_endpoint *ep, uint8_t **packet, int *result)
-{
-	uint8_t* data = *packet;
-	if (data[0] == PACKET_TYPE_ACK) {
-		*result = PACKET_FILTERED_OUT;
-		return 1;
-	}
-	return 0;
-}
 
 // Called before sending command or notify to make sure that last notification was finished and the other end
 // can handle this packet imidetally.
@@ -178,20 +171,22 @@ void wait_for_last_ack(struct rpser_endpoint *ep)
 	int packet_length;
 	packet_type type;
 
-        if (!ep->waiting_for_ack) {
+	if (!ep->waiting_for_ack) {
 		return;
 	}
 
 	do {
-	        // Wait for something from rx callback
-	        packet_length = rp_trans_read_start(&ep->trans_ep, &packet, event_ack_filter);
-		if (packet_length == PACKET_FILTERED_OUT)
+		// Wait for something from rx callback
+		packet_length = rp_trans_read(&ep->trans_ep, &packet);
+
+		if (packet == NULL)
 		{
+			__ASSERT(packet_length == FILTERED_ACK, "Invalid response");
 			ep->waiting_for_ack = false;
-			return;
+			return 0;
 		}
 
-                switch (packet[0])
+		switch (packet[0])
 		{
 		case PACKET_TYPE_CMD:
 		case PACKET_TYPE_NOTIFY:
@@ -199,8 +194,7 @@ void wait_for_last_ack(struct rpser_endpoint *ep)
 			handle_packet(ep, packet, packet_length);
 			break;
 		default:
-			// TODO: Invalid State Error Log
-			rp_trans_read_end();
+			__ASSERT(0, "Invalid response");
 			break;
 		}
 	} while (true);
@@ -256,7 +250,7 @@ void call_remote_no_decoder(struct rpser_endpoint *ep, struct decode_buffer *in,
 
 void call_remote_done(struct rpser_endpoint *ep)
 {
-	rp_trans_read_end(&ep->rp_trans_ep);
+	rp_trans_release_buffer(&ep->rp_trans_ep);
 	rp_trans_give(&ep->trans_ep);
 }
 
@@ -338,7 +332,7 @@ void notify_update(int count)
 // called by decoder to inform rx callback that decoding is done and it can continue (discard buffers)
 void decode_params_done(struct rpser_endpoint *ep)
 {
-        rp_trans_read_end(ep);
+        rp_trans_release_buffer(ep);
 }
  
 // example decoder (universal: for both commands and notifications)

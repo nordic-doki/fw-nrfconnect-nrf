@@ -31,7 +31,6 @@ extern "C" {
 
 
 struct rp_trans_endpoint {
-	struct rp_ll_endpoint ll_ep;
 	/* Union allows reuse of memory taken by fields that are never used in
 	 * the same time.
 	 */
@@ -46,12 +45,14 @@ struct rp_trans_endpoint {
 		struct {
 			const uint8_t *input_buffer;
 			atomic_t input_length;
-			bool running;
+			bool reading;
 			bool wait_for_done;
+			struct rp_ll_endpoint ll_ep;
 			struct k_mutex mutex;
 			struct k_sem input_sem;
 			struct k_sem done_sem;
-			struct k_thread thread;
+			struct k_work work;
+			struct k_work_q work_queue;
 		};
 	};
 };
@@ -84,10 +85,10 @@ int rp_trans_init(rp_trans_receive_handler callback, rp_trans_filter filter);
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 	int endpoint_number);
 
-#define rp_trans_alloc_tx_buf(endpoint, buf, length) \
-	ARG_UNUSED(endpoint); \
-	u32_t _rp_trans_buf_vla \
-		[(*(length) + sizeof(u32_t) - 1) / sizeof(u32_t)]; \
+#define rp_trans_alloc_tx_buf(endpoint, buf, length)                           \
+	ARG_UNUSED(endpoint);                                                  \
+	u32_t _rp_trans_buf_vla                                                \
+		[(*(length) + sizeof(u32_t) - 1) / sizeof(u32_t)];             \
 	*(buf) = (u8_t *)(&_rp_trans_buf_vla[0])
 
 #define rp_trans_free_tx_buf(endpoint, buf)
