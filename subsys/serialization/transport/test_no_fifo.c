@@ -47,13 +47,13 @@ typedef void (*rp_ser_resp_decoder)(struct decode_buffer *dec, void* result);
  
 // callback called from transport endpoint receive thread
 static void rp_trans_rx_callback(struct rpser_endpoint *ep, u8_t* buf, size_t length)
-{
+{//done
 	handle_packet(ep, buf, length);
 }
 
 // called from endpoint thread or loop waiting for response
 void handle_packet(u8_t* data, size_t length) // TODO: merge with rp_trans_rx_callback
-{
+{ // done
         packet_type type;
 
 	if (data == NULL) {
@@ -86,7 +86,10 @@ void handle_packet(u8_t* data, size_t length) // TODO: merge with rp_trans_rx_ca
         // Resore previous state of waiting for ack
         if (packet_type == PACKET_TYPE_CMD) {
                 ep->waiting_for_ack = prev_wait_for_ack;
-        }
+        } else if (handle_packet == PACKET_TYPE_EVENT) {
+		uint8_t buf[1] = PACKET_TYPE_ACK;
+		rp_trans_send(&ep->trans_ep, buf, sizeof(buf));
+	}
 #endif /* USE_EVENT_ACK */
 }
  
@@ -94,7 +97,7 @@ void handle_packet(u8_t* data, size_t length) // TODO: merge with rp_trans_rx_ca
 typedef uint64_t decoder_old_state_t;
 
 decoder_old_state_t set_decoder(struct rpser_endpoint *ep, rp_ser_resp_decoder decoder, void *result)
-{
+{//not yet
 	// TODO: Different platforms
 	uint64_t state = (uint64_t)(uintptr_t)(void*)ep->decoder + (uint64_t)(uintptr_t)ep->decoder_result << 32;
 	ep->decoder = decoder;
@@ -104,7 +107,7 @@ decoder_old_state_t set_decoder(struct rpser_endpoint *ep, rp_ser_resp_decoder d
 
 
 bool trans_filter(struct rp_trans_endpoint *endpoint, const uint8_t *buf, size_t length)
-{
+{//done
 	switch (buf[0])
 	{
 	case PACKET_TYPE_RESPONSE:
@@ -128,7 +131,7 @@ bool trans_filter(struct rp_trans_endpoint *endpoint, const uint8_t *buf, size_t
 
 // Call after send of command to wait for response
 int wait_for_response(struct rpser_endpoint *ep, uint8_t **out_packet)
-{
+{//done
 	uint8_t *packet;
 	int packet_length;
 
@@ -166,7 +169,7 @@ int wait_for_response(struct rpser_endpoint *ep, uint8_t **out_packet)
 // Called before sending command or notify to make sure that last notification was finished and the other end
 // can handle this packet imidetally.
 void wait_for_last_ack(struct rpser_endpoint *ep)
-{
+{//done
 	uint8_t *packet;
 	int packet_length;
 	packet_type type;
@@ -204,7 +207,7 @@ void wait_for_last_ack(struct rpser_endpoint *ep)
 
 // Call remote function (command): send cmd and data, wait and return response
 void call_remote(struct rpser_endpoint *ep, struct decode_buffer *in, rp_ser_resp_decoder decoder, void *result)
-{
+{// done
 	decoder_old_state_t old_state;
         // Endpoint is not accessible by other thread from this point
 	rp_trans_own(&ep->trans_ep);
@@ -226,7 +229,7 @@ void call_remote(struct rpser_endpoint *ep, struct decode_buffer *in, rp_ser_res
 
 // Call remote function (command): send cmd and data, wait and return response
 void call_remote_no_decoder(struct rpser_endpoint *ep, struct decode_buffer *in, struct decode_buffer *out)
-{
+{// not yet
 	uint8_t **packet;
 	int packet_length;
 	decoder_old_state_t old_state;
@@ -249,17 +252,17 @@ void call_remote_no_decoder(struct rpser_endpoint *ep, struct decode_buffer *in,
 }
 
 void call_remote_done(struct rpser_endpoint *ep)
-{
+{ // not yet
 	rp_trans_release_buffer(&ep->rp_trans_ep);
 	rp_trans_give(&ep->trans_ep);
 }
 
 // Execute notification: send notification, do not wait - only mark that we are expecting ack later
 void notify_remote(struct rpser_endpoint *ep, struct decode_buffer *in)
-{
-#if USE_EVENT_ACK
+{// done
         // Endpoint is not accessible by other thread from this point
 	rp_trans_own(&ep->trans_ep);
+#if USE_EVENT_ACK
         // Make sure that someone can handle packet immidietallty
         wait_for_last_ack(ep);
         // we are expecting ack later
@@ -267,15 +270,13 @@ void notify_remote(struct rpser_endpoint *ep, struct decode_buffer *in)
 #endif /* USE_EVENT_ACK */
         // Send buffer to transport layer
         rp_trans_send(&ep->trans_ep, in->data, in->length);
-#if USE_EVENT_ACK
         // We can unlock now, nothing more to do
 	rp_trans_give(&ep->trans_ep);
-#endif /* USE_EVENT_ACK */
 }
  
 // Inform that decoding is done and nothing more must be done
 void send_response(struct rpser_endpoint *ep, struct decode_buffer *out)
-{
+{//done
         rp_trans_send(&ep->trans_ep, out->data, out->length);
 }
 

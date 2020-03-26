@@ -30,6 +30,9 @@ extern "C" {
 #endif
 
 
+#define RP_TRANS_REQUIRE_EVENT_ACK 1
+
+
 struct rp_trans_endpoint {
 	/* Union allows reuse of memory taken by fields that are never used in
 	 * the same time.
