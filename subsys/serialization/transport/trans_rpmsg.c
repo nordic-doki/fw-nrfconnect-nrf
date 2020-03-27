@@ -127,7 +127,7 @@ static void event_handler(struct rp_ll_endpoint *ll_ep,
 
 	k_sem_give(&endpoint->input_sem);
 	if (!endpoint->reading) {
-		k_work_submit(&endpoint->work);
+		k_work_submit_to_queue(&endpoint->work_queue, &endpoint->work);
 	}
 	endpoint->reading = false;
 	

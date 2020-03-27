@@ -14,7 +14,7 @@
 
 #include "../../ser_common.h"
 
-RP_SER_DEFINE(entropy_ser, struct k_sem, 0, 1000, 0);
+RP_SER_DEFINE(entropy_ser, struct k_sem, 0, 2048, 3);
 
 static struct device *entropy;
 
@@ -76,6 +76,8 @@ static rp_err_t entropy_init_handler(CborValue *it)
 {
 	int err;
 
+	rp_ser_decode_done(&entropy_ser);
+
 	entropy = device_get_binding(CONFIG_ENTROPY_NAME);
 	if (!entropy) {
 		rsp_error_code_send(-EINVAL);
@@ -99,8 +101,11 @@ static rp_err_t entropy_get_handler(CborValue *it)
 
 	if (!cbor_value_is_integer(it) ||
 	    cbor_value_get_int(it, &length) != CborNoError) {
+		rp_ser_decode_done(&entropy_ser);
 		return RP_ERROR_INTERNAL;
 	}
+
+	rp_ser_decode_done(&entropy_ser);
 
 	buf = k_malloc(length);
 	if (!buf) {
