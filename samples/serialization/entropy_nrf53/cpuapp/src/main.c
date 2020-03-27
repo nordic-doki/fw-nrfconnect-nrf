@@ -27,6 +27,8 @@ void main(void)
 	}
 
 	while (true) {
+		k_sleep(K_MSEC(1000));
+		
 		err = entropy_remote_get(buffer, sizeof(buffer));
 		if (err) {
 			printk("Entropy remote get failed: %d\n", err);
@@ -38,7 +40,5 @@ void main(void)
 		}
 
 		printk("\n");
-
-		k_sleep(K_MSEC(1000));
 	}
 }
