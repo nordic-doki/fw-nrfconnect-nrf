@@ -19,7 +19,8 @@
 
 LOG_MODULE_REGISTER(rp_ll_api);
 
-static struct k_sem ipm_event_sem;
+static struct k_work_q my_work_q;
+static struct k_work work_item;
 
 /* Indicates that handshake was done by this endpoint */
 #define EP_FLAG_HANSHAKE_DONE 1
@@ -123,7 +124,7 @@ const struct virtio_dispatch dispatch = {
 /* Callback launch right after some data has arrived. */
 static void ipm_callback(void *context, u32_t id, volatile void *data)
 {
-	k_sem_give(&ipm_event_sem);
+	k_work_submit_to_queue(&my_work_q, &work_item);
 }
 
 /* Callback launch right after virtqueue_notification from rx_thread. */
@@ -152,21 +153,11 @@ static void rpmsg_service_unbind(struct rpmsg_endpoint *ep)
 {
 	rpmsg_destroy_ept(ep);
 }
-
-static void rx_thread(void *p1, void *p2, void *p3)
+ 
+void work_callback(struct k_work *item)
 {
-	ARG_UNUSED(p1);
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
-
-	while (1) {
-		int status = k_sem_take(&ipm_event_sem, K_FOREVER);
-
-		if (status == 0) {
-			virtqueue_notification(IS_ENABLED(CONFIG_RPMSG_MASTER) ?
-					       vq[0] : vq[1]);
-		}
-	}
+	ARG_UNUSED(item);
+	virtqueue_notification(IS_ENABLED(CONFIG_RPMSG_MASTER) ? vq[0] : vq[1]);
 }
 
 int rp_ll_send(struct rp_ll_endpoint *endpoint, const u8_t *buf,
@@ -188,9 +179,6 @@ int rp_ll_init(void)
 	struct metal_io_region *shm_io;
 	struct metal_device *device;
 	struct rpmsg_virtio_shm_pool *pshpool = NULL;
-
-	/* Init semaphores. */
-	k_sem_init(&ipm_event_sem, 0, 1);
 
 	/* Libmetal setup. */
 	err = metal_init(&metal_params);
@@ -284,12 +272,11 @@ int rp_ll_init(void)
 
 	/* Get RPMsg device from RPMsg VirtIO device. */
 	rdev = rpmsg_virtio_get_rpmsg_device(&rvdev);
-
-	k_thread_create(&rx_thread_data, rx_thread_stack,
-			K_THREAD_STACK_SIZEOF(rx_thread_stack),
-			rx_thread, NULL, NULL, NULL,
-			CONFIG_RP_TRANS_PRMSG_RX_PRIORITY, 0,
-			K_NO_WAIT);
+ 
+	k_work_q_start(&my_work_q, rx_thread_stack,
+		K_THREAD_STACK_SIZEOF(rx_thread_stack),
+		CONFIG_RP_TRANS_PRMSG_RX_PRIORITY);
+	k_work_init(&work_item, work_callback);
 
 	LOG_DBG("initializing %s: SUCCESS", __func__);
 
