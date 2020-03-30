@@ -17,7 +17,7 @@ struct entropy_rsp {
 	int err_code;
 };
 
-RP_SER_DEFINE(entropy_ser, struct k_sem, 0, 2048, 3);
+RP_SER_DEFINE(entropy_ser, 0, 2048, 3);
 
 static struct entropy_rsp rsp_data;
 

@@ -14,7 +14,7 @@
 
 #include "../../ser_common.h"
 
-RP_SER_DEFINE(entropy_ser, struct k_sem, 0, 2048, 3);
+RP_SER_DEFINE(entropy_ser, 0, 2048, 3);
 
 static struct device *entropy;
 
