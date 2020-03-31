@@ -14,6 +14,19 @@
 
 static u8_t buffer[BUFFER_LENGTH];
 
+static void async_callback(u8_t* buffer, size_t length)
+{
+	size_t i;
+
+	printk("async");
+
+	for (i = 0; i < length; i++) {
+		printk("  0x%02x", buffer[i]);
+	}
+
+	printk("\n");
+}
+
 void main(void)
 {
 	int err;
@@ -35,10 +48,20 @@ void main(void)
 			continue;
 		}
 
+		printk("sync ");
+
 		for (int i = 0; i < BUFFER_LENGTH; i++) {
 			printk("  0x%02x", buffer[i]);
 		}
 
 		printk("\n");
+
+		k_sleep(K_MSEC(1000));
+
+		err = entropy_remote_get_async(sizeof(buffer), async_callback);
+		if (err) {
+			printk("Entropy remote get async failed: %d\n", err);
+			continue;
+		}
 	}
 }

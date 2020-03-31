@@ -21,21 +21,16 @@ static struct device *entropy;
 static int rsp_error_code_send(int err_code)
 {
 	rp_err_t err;
-	CborEncoder encoder;
-	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
-	rp_ser_buf_alloc(rsp_buf, entropy_ser, packet_size);
+	RP_SER_RSP_ALLOC(rsp_buf, &entropy_ser, sizeof(int));
 
-	err = rp_ser_rsp_init(&rsp_buf, &encoder);
-	if (err) {
-		return -EINVAL;
+	if (RP_SER_ALLOC_FAILED(rsp_buf)) {
+		return -ENOMEM;
 	}
 
-	if (cbor_encode_int(&encoder, err_code) != CborNoError) {
-		return -EINVAL;
-	}
+	*(int *)&rsp_buf[0] = err_code;
 
-	err = rp_ser_rsp_send(&entropy_ser, &rsp_buf, &encoder);
+	err = rp_ser_rsp_send(&entropy_ser, rsp_buf, sizeof(int));
 	if (err) {
 		return -EINVAL;
 	}
@@ -46,25 +41,17 @@ static int rsp_error_code_send(int err_code)
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
 	rp_err_t err;
-	CborEncoder encoder;
-	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
 
-	rp_ser_buf_alloc(rsp_buf, entropy_ser, packet_size);
+	RP_SER_RSP_ALLOC(rsp_buf, &entropy_ser, sizeof(int) + length);
 
-	err = rp_ser_rsp_init(&rsp_buf, &encoder);
-	if (err) {
-		return -EINVAL;
+	if (RP_SER_ALLOC_FAILED(rsp_buf)) {
+		return -ENOMEM;
 	}
 
-	if (cbor_encode_int(&encoder, err_code) != CborNoError) {
-		return -EINVAL;
-	}
+	*(int *)&rsp_buf[0] = err_code;
+	memcpy(&rsp_buf[sizeof(int)], data, length);
 
-	if (cbor_encode_byte_string(&encoder, data, length) != CborNoError) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_rsp_send(&entropy_ser, &rsp_buf, &encoder);
+	err = rp_ser_rsp_send(&entropy_ser, rsp_buf, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -72,11 +59,32 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-static rp_err_t entropy_init_handler(CborValue *it)
+static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
+{
+	rp_err_t err;
+
+	RP_SER_EVT_ALLOC(rsp_buf, &entropy_ser, sizeof(int) + length);
+
+	if (RP_SER_ALLOC_FAILED(rsp_buf)) {
+		return -ENOMEM;
+	}
+
+	*(int *)&rsp_buf[0] = err_code;
+	memcpy(&rsp_buf[sizeof(int)], data, length);
+
+	err = rp_ser_evt_send(&entropy_ser, SER_EVENT_ENTROPY_GET_ASYNC_RESULT, rsp_buf, sizeof(int) + length);
+	if (err) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static rp_err_t entropy_init_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
 {
 	int err;
 
-	rp_ser_decode_done(&entropy_ser);
+	rp_ser_handler_decoding_done(&entropy_ser);
 
 	entropy = device_get_binding(CONFIG_ENTROPY_NAME);
 	if (!entropy) {
@@ -93,19 +101,20 @@ static rp_err_t entropy_init_handler(CborValue *it)
 	return RP_SUCCESS;
 }
 
-static rp_err_t entropy_get_handler(CborValue *it)
+static rp_err_t entropy_get_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
 {
 	int err;
-	int length;
+	uint16_t length;
 	u8_t *buf;
-
-	if (!cbor_value_is_integer(it) ||
-	    cbor_value_get_int(it, &length) != CborNoError) {
-		rp_ser_decode_done(&entropy_ser);
+	
+	if (packet_len < sizeof(uint16_t)) {
+		rp_ser_handler_decoding_done(&entropy_ser);
 		return RP_ERROR_INTERNAL;
 	}
 
-	rp_ser_decode_done(&entropy_ser);
+	length = *(uint16_t *)&packet[0];
+
+	rp_ser_handler_decoding_done(&entropy_ser);
 
 	buf = k_malloc(length);
 	if (!buf) {
@@ -114,7 +123,12 @@ static rp_err_t entropy_get_handler(CborValue *it)
 
 	err = entropy_get_entropy(entropy, buf, length);
 
-	err = entropy_get_rsp(err, buf, length);
+	if (code == SER_EVENT_ENTROPY_GET_ASYNC) {
+		err = entropy_get_result_evt(err, buf, length);
+	} else {
+		err = entropy_get_rsp(err, buf, length);
+	}
+
 	if (err) {
 		return RP_ERROR_INTERNAL;
 	}
@@ -141,6 +155,8 @@ static int serialization_init(struct device *dev)
 RP_SER_CMD_DECODER(entropy_ser, entropy_init, SER_COMMAND_ENTROPY_INIT,
 		   entropy_init_handler);
 RP_SER_CMD_DECODER(entropy_ser, entropy_get, SER_COMMAND_ENTROPY_GET,
+		   entropy_get_handler);
+RP_SER_EVT_DECODER(entropy_ser, entropy_get_async, SER_EVENT_ENTROPY_GET_ASYNC,
 		   entropy_get_handler);
 
 SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);

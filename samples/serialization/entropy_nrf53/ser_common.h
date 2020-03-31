@@ -19,11 +19,12 @@ extern "C" {
 
 enum ser_command {
 	SER_COMMAND_ENTROPY_INIT = 0x01,
-	SER_COMMAND_ENTROPY_GET = 0x02
+	SER_COMMAND_ENTROPY_GET = 0x02,
 };
 
 enum ser_evt {
-	SER_EVT_ENTROPY_RECEIVED = 0x01
+	SER_EVENT_ENTROPY_GET_ASYNC = 0x03,
+	SER_EVENT_ENTROPY_GET_ASYNC_RESULT = 0x04,
 };
 
 #ifdef __cplusplus

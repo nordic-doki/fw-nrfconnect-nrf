@@ -88,13 +88,15 @@ int rp_trans_init(rp_trans_receive_handler callback, rp_trans_filter filter);
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 	int endpoint_number);
 
-#define rp_trans_alloc_tx_buf(endpoint, buf, length)                           \
+#define rp_trans_alloc_tx_buf(endpoint, buf, header_len, data_len)                           \
 	ARG_UNUSED(endpoint);                                                  \
 	u32_t _rp_trans_buf_vla                                                \
-		[(*(length) + sizeof(u32_t) - 1) / sizeof(u32_t)];             \
+		[(sizeof(u32_t) - 1 + (header_len) + (data_len)) / sizeof(u32_t)];             \
 	*(buf) = (u8_t *)(&_rp_trans_buf_vla[0])
 
 #define rp_trans_free_tx_buf(endpoint, buf)
+
+#define rp_trans_alloc_failed(buf) 0
 
 int rp_trans_send(struct rp_trans_endpoint *endpoint, const u8_t *buf,
 	size_t buf_len);
@@ -106,6 +108,8 @@ void rp_trans_give(struct rp_trans_endpoint *endpoint);
 int rp_trans_read(struct rp_trans_endpoint *endpoint, const uint8_t **buf);
 
 void rp_trans_release_buffer(struct rp_trans_endpoint *endpoint);
+
+void printbuf(const char* text, const uint8_t *packet, size_t len);
 
 #ifdef __cplusplus
 }

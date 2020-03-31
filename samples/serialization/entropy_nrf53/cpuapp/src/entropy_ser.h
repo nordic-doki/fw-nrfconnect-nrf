@@ -37,6 +37,16 @@ int entropy_remote_init(void);
  */
 int entropy_remote_get(u8_t *buffer, u16_t length);
 
+/**@brief Function for getting entropy value from the remote driver.
+ *
+ * @param[out] buffer Received entropy data.
+ * @param[in] length Requested entropy length.
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int entropy_remote_get_async(u16_t length, void (*callback)(u8_t* buffer, size_t length));
+
 #ifdef __cplusplus
 }
 #endif
