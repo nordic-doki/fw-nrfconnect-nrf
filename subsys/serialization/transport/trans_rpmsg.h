@@ -88,10 +88,10 @@ int rp_trans_init(rp_trans_receive_handler callback, rp_trans_filter filter);
 int rp_trans_endpoint_init(struct rp_trans_endpoint *endpoint,
 	int endpoint_number);
 
-#define rp_trans_alloc_tx_buf(endpoint, buf, header_len, data_len)                           \
+#define rp_trans_alloc_tx_buf(endpoint, buf, len)                           \
 	ARG_UNUSED(endpoint);                                                  \
 	u32_t _rp_trans_buf_vla                                                \
-		[(sizeof(u32_t) - 1 + (header_len) + (data_len)) / sizeof(u32_t)];             \
+		[(sizeof(u32_t) - 1 + (len)) / sizeof(u32_t)];             \
 	*(buf) = (u8_t *)(&_rp_trans_buf_vla[0])
 
 #define rp_trans_free_tx_buf(endpoint, buf)

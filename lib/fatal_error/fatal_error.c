@@ -22,7 +22,8 @@ void k_sys_fatal_error_handler(unsigned int reason,
 	LOG_PANIC();
 
 	LOG_ERR("Resetting system");
-	sys_arch_reboot(0);
+	//sys_arch_reboot(0);
+	while (1);
 
 	CODE_UNREACHABLE;
 }
