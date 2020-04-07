@@ -6,7 +6,7 @@
 
 #include <zephyr.h>
 
-#include <rp_ser.h>
+#include <nrf_rpc.h>
 
 #include "entropy_ser.h"
 

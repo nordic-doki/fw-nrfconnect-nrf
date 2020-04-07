@@ -33,4 +33,4 @@ rsource "mpsl/Kconfig"
 
 rsource "partition_manager/Kconfig"
 
-rsource "serialization/Kconfig"
+rsource "nrf_rpc/Kconfig"

@@ -6,11 +6,12 @@
 #include <errno.h>
 #include <init.h>
 
-#include <rp_ser.h>
+#include <nrf_rpc.h>
 #include <cbor.h>
 
 #include "../../ser_common.h"
 
+#if 0
 struct entropy_rsp {
 	u8_t *buffer;
 	u16_t length;
@@ -161,3 +162,4 @@ RP_SER_EVT_DECODER(entropy_ser, entropy_get_result, SER_EVENT_ENTROPY_GET_ASYNC_
 		   entropy_get_result_handler);
 
 SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
+#endif

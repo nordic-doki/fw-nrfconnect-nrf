@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#if 0
 #include <zephyr.h>
 #include <errno.h>
 
@@ -210,3 +211,4 @@ void rp_trans_release_buffer(struct rp_trans_endpoint *endpoint)
 {
 	k_sem_give(&endpoint->done_sem);
 }
+#endif
