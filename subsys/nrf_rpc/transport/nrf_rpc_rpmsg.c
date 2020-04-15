@@ -144,12 +144,12 @@ void thread_pool_entry(void *p1, void *p2, void *p3)
 {
 	struct nrf_rpc_tr_local_ep *local_ep = (struct nrf_rpc_tr_local_ep *)p1;
 	struct nrf_rpc_tr_remote_ep *src;
-	uint8_t *buf;
+	const uint8_t *buf;
 	int len;
 
 	do {
 		len = nrf_rpc_tr_read(local_ep, &src, &buf);
-		receive_callback(src, buf, len);
+		receive_callback(local_ep, src, buf, len);
 	} while (true);
 }
 
@@ -187,10 +187,15 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 	}
 
 	for (i = 0; i < CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE; i++) {
+		struct nrf_rpc_tr_local_ep *ep = &local_endpoints[i].tr_ep;
+		ep->addr = i;
+		ep->addr_mask = 1 << i;
+		k_sem_init(&ep->done_sem, 0, 1);
+		k_sem_init(&ep->input_sem, 0, 1);
 		k_thread_create(&pool_threads[i], pool_stacks[i],
 			K_THREAD_STACK_SIZEOF(pool_stacks[i]),
 			thread_pool_entry,
-			&local_endpoints[i].tr_ep, NULL, NULL,
+			ep, NULL, NULL,
 			CONFIG_NRF_RPC_LOCAL_THREAD_PRIORITY, 0, K_NO_WAIT);
 	}
 
@@ -217,16 +222,22 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 {
 	uint32_t len;
 
+	if (local_ep->buffer_owned) {
+		// TODO: warning (should be done before)
+		k_sem_give(&local_ep->done_sem);
+	}
+
 	do {
 		k_sem_take(&local_ep->input_sem, K_FOREVER);
 		len = (uint32_t)atomic_set(&local_ep->input_length, (atomic_val_t)0);
 	} while (len < NRF_RPC_TR_HEADER_SIZE);
 
 	if (len & FLAG_FILTERED) {
-		nrf_rpc_tr_release_buffer(local_ep);
+		k_sem_give(&local_ep->done_sem);
 		*buf = NULL;
 		len ^= FLAG_FILTERED;
 	} else {
+		local_ep->buffer_owned = true;
 		*buf = local_ep->input_buffer + NRF_RPC_TR_HEADER_SIZE;
 		len -= NRF_RPC_TR_HEADER_SIZE;
 	}
@@ -236,7 +247,10 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 
 void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep)
 {
-	k_sem_give(&local_ep->done_sem);
+	if (local_ep->buffer_owned) {
+		local_ep->buffer_owned = false;
+		k_sem_give(&local_ep->done_sem);
+	}
 }
 
 struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
@@ -261,7 +275,6 @@ struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 
 	ep->addr = new_index;
 	ep->addr_mask = (1 << new_index);
-	atomic_clear(&ep->input_length);
 	k_sem_init(&ep->done_sem, 0, 1);
 	k_sem_init(&ep->input_sem, 0, 1);
 

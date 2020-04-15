@@ -47,6 +47,22 @@ void entropy_remote_init_noerr(void)
 	NRF_RPC_CMD_SEND_NOERR(&entropy_group, SER_COMMAND_ENTROPY_INIT, packet, 0, NULL, NULL);
 }
 
+static int serialization_init(struct device *dev)
+{
+	ARG_UNUSED(dev);
+
+	rp_err_t err;
+
+	err = nrf_rpc_init();
+	if (err) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+
+SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
 
 #if 0
 struct entropy_rsp {

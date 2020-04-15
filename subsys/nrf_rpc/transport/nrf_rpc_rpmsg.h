@@ -55,6 +55,7 @@ struct nrf_rpc_tr_local_ep {
 	struct k_sem input_sem;
 	struct k_sem done_sem;
 	bool wait_for_done;
+	bool buffer_owned;
 	atomic_t input_length;
 	const uint8_t* input_buffer;
 	void* custom_data;
