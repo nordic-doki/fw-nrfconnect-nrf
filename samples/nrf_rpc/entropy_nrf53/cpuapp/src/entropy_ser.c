@@ -11,6 +11,43 @@
 
 #include "../../ser_common.h"
 
+NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_FIRST);
+
+rp_err_t rsp_error_code_handle(const uint8_t *packet, size_t len,
+				  void* hander_data)
+{
+	if (len < sizeof(int)) {
+		return NRF_RPC_ERR_INVALID_PARAM;
+	}
+	*(int *)hander_data = *(int *)&packet[0];
+
+	return NRF_RPC_SUCCESS;
+}
+
+int entropy_remote_init(void)
+{
+	int result;
+	rp_err_t err;
+	uint8_t* packet;
+
+	NRF_RPC_CMD_ALLOC(&entropy_group, &packet, 0, return -ENOMEM);
+
+	err = NRF_RPC_CMD_SEND(&entropy_group, SER_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
+	if (err) {
+		return -EINVAL;
+	}
+
+	return result;
+}
+
+void entropy_remote_init_noerr(void)
+{
+	uint8_t* packet;
+	NRF_RPC_CMD_ALLOC(&entropy_group, &packet, 0, return);
+	NRF_RPC_CMD_SEND_NOERR(&entropy_group, SER_COMMAND_ENTROPY_INIT, packet, 0, NULL, NULL);
+}
+
+
 #if 0
 struct entropy_rsp {
 	u8_t *buffer;
@@ -22,16 +59,6 @@ RP_SER_DEFINE(entropy_ser, 0, 2048, 3);
 
 static struct entropy_rsp rsp_data;
 static void (*async_callback)(u8_t* buffer, size_t length);
-
-static rp_err_t rsp_error_code_handle(const uint8_t *packet, size_t packet_len)
-{
-	if (packet_len < sizeof(int)) {
-		return RP_ERROR_INVALID_PARAM;
-	}
-	rsp_data.err_code = *(int *)&packet[0];
-
-	return RP_SUCCESS;
-}
 
 static rp_err_t entropy_get_rsp(const uint8_t *packet, size_t packet_len)
 {

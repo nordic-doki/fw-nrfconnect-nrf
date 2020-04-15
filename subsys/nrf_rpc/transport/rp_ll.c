@@ -79,7 +79,6 @@ static struct rpmsg_virtio_shm_pool shpool;
 /* Thread properties */
 static K_THREAD_STACK_DEFINE(rx_thread_stack,
 	CONFIG_RP_TRANS_PRMSG_RX_STACK_SIZE);
-static struct k_thread rx_thread_data;
 
 
 static unsigned char virtio_get_status(struct virtio_device *vdev)

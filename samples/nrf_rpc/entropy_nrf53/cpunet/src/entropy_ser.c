@@ -7,13 +7,59 @@
 #include <init.h>
 #include <drivers/entropy.h>
 
-#include <rp_ser.h>
+#include <nrf_rpc.h>
 #include <cbor.h>
 
 #include <device.h>
 
 #include "../../ser_common.h"
 
+NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_FIRST);
+
+static struct device *entropy;
+
+static int rsp_error_code_send(int err_code)
+{
+	rp_err_t err;
+	uint8_t* packet;
+
+	NRF_RPC_RSP_ALLOC(&packet, sizeof(int), return -ENOMEM);
+
+	*(int *)&packet[0] = err_code;
+
+	err = NRF_RPC_RSP_SEND(packet, sizeof(int));
+	if (err) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static rp_err_t entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+{
+	int err;
+
+	nrf_rpc_decoding_done();
+
+	entropy = device_get_binding(CONFIG_ENTROPY_NAME);
+	if (!entropy) {
+		rsp_error_code_send(-EINVAL);
+
+		return NRF_RPC_ERR_INTERNAL;
+	}
+
+	err = rsp_error_code_send(0);
+	if (err) {
+		return NRF_RPC_ERR_INTERNAL;
+	}
+
+	return NRF_RPC_SUCCESS;
+}
+
+NRF_RPC_CMD_DECODER(entropy_group, entropy_init, SER_COMMAND_ENTROPY_INIT,
+		   entropy_init_handler, NULL);
+
+#if 0
 RP_SER_DEFINE(entropy_ser, 0, 2048, 3);
 
 static struct device *entropy;
@@ -160,3 +206,4 @@ RP_SER_EVT_DECODER(entropy_ser, entropy_get_async, SER_EVENT_ENTROPY_GET_ASYNC,
 		   entropy_get_handler);
 
 SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
+#endif

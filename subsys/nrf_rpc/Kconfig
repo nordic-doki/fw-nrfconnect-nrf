@@ -24,45 +24,13 @@ config NRF_RPC_LOCAL_THREAD_POOL_SIZE
 	range 1 8
 	default 3
 
-config NRF_RPC_LOCAL_THREAD_1_STACK_SIZE
-	int "Stack size of thread 1 from thread pool"
+config NRF_RPC_LOCAL_THREAD_STACK_SIZE
+	int "Stack size of thread from thread pool"
 	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 1
 
-config NRF_RPC_LOCAL_THREAD_2_STACK_SIZE
-	int "Stack size of thread 2 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 2
-
-config NRF_RPC_LOCAL_THREAD_3_STACK_SIZE
-	int "Stack size of thread 3 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 3
-
-config NRF_RPC_LOCAL_THREAD_4_STACK_SIZE
-	int "Stack size of thread 4 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 4
-
-config NRF_RPC_LOCAL_THREAD_5_STACK_SIZE
-	int "Stack size of thread 5 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 5
-
-config NRF_RPC_LOCAL_THREAD_6_STACK_SIZE
-	int "Stack size of thread 6 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 6
-
-config NRF_RPC_LOCAL_THREAD_7_STACK_SIZE
-	int "Stack size of thread 7 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 7
-
-config NRF_RPC_LOCAL_THREAD_8_STACK_SIZE
-	int "Stack size of thread 8 from thread pool"
-	default 1024
-	depends on NRF_RPC_LOCAL_THREAD_POOL_SIZE >= 8
+config NRF_RPC_LOCAL_THREAD_PRIORITY
+	int "Priority of thread from thread pool"
+	default 2
 
 endmenu
 
@@ -73,89 +41,10 @@ config NRF_RPC_REMOTE_THREAD_POOL_SIZE
 	range 1 8
 	default 3
 
-endmenu
-
-menu "(example) TODO: Remove it"
-
-config BT_NRF_RPC_THREAD_1_CMD_OFF
-	bool "Do not use remote thread 1 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 1
-
-config BT_NRF_RPC_THREAD_2_CMD_OFF
-	bool "Do not use remote thread 2 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 2
-
-config BT_NRF_RPC_THREAD_3_CMD_OFF
-	bool "Do not use remote thread 3 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 3
-
-config BT_NRF_RPC_THREAD_4_CMD_OFF
-	bool "Do not use remote thread 4 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 4
-
-config BT_NRF_RPC_THREAD_5_CMD_OFF
-	bool "Do not use remote thread 5 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 5
-
-config BT_NRF_RPC_THREAD_6_CMD_OFF
-	bool "Do not use remote thread 6 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 6
-
-config BT_NRF_RPC_THREAD_7_CMD_OFF
-	bool "Do not use remote thread 7 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 7
-
-config BT_NRF_RPC_THREAD_8_CMD_OFF
-	bool "Do not use remote thread 8 for commands"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 8
-
-config BT_NRF_RPC_THREAD_1_EVT_OFF
-	bool "Do not use remote thread 1 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 1
-
-config BT_NRF_RPC_THREAD_2_EVT_OFF
-	bool "Do not use remote thread 2 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 2
-
-config BT_NRF_RPC_THREAD_3_EVT_OFF
-	bool "Do not use remote thread 3 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 3
-
-config BT_NRF_RPC_THREAD_4_EVT_OFF
-	bool "Do not use remote thread 4 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 4
-
-config BT_NRF_RPC_THREAD_5_EVT_OFF
-	bool "Do not use remote thread 5 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 5
-
-config BT_NRF_RPC_THREAD_6_EVT_OFF
-	bool "Do not use remote thread 6 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 6
-
-config BT_NRF_RPC_THREAD_7_EVT_OFF
-	bool "Do not use remote thread 7 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 7
-
-config BT_NRF_RPC_THREAD_8_EVT_OFF
-	bool "Do not use remote thread 8 for events"
-	default n
-	depends on NRF_RPC_REMOTE_THREAD_POOL_SIZE >= 8
+config NRF_RPC_REMOTE_EXTRA_EP_COUNT
+	int "Number of extra remote endpoints"
+	range 1 8
+	default 3
 
 endmenu
 

@@ -8,6 +8,7 @@
 #define NRF_RPC_TR_RPMSG_H_
 
 #include <zephyr.h>
+#include <sys/slist.h>
 #include <metal/sys.h>
 #include <metal/device.h>
 #include <metal/alloc.h>
@@ -29,23 +30,47 @@
 extern "C" {
 #endif
 
+#define NRF_RPC_TR_HEADER_SIZE 2
+
+#if (CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE <= 8) && (CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE <= 8)
+typedef uint8_t nrf_rpc_tr_addr_mask_t;
+#elif (CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE <= 16) && (CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE <= 16)
+typedef uint16_t nrf_rpc_tr_addr_mask_t;
+#else
+typedef uint32_t nrf_rpc_tr_addr_mask_t;
+RP_STATIC_ASSERT(CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE < 32, "Too many items in local thread pool");
+RP_STATIC_ASSERT(CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE < 32, "Too many items in local thread pool");
+#endif
+
 struct nrf_rpc_tr_remote_ep {
-	int TODO;
+	sys_snode_t node;
+	bool used;
+	uint8_t addr;
+	nrf_rpc_tr_addr_mask_t addr_mask;
 };
 
 struct nrf_rpc_tr_local_ep {
-	int TODO;
+	uint8_t addr;
+	nrf_rpc_tr_addr_mask_t addr_mask;
+	struct k_sem input_sem;
+	struct k_sem done_sem;
+	bool wait_for_done;
+	atomic_t input_length;
+	const uint8_t* input_buffer;
+	void* custom_data;
 };
 
 struct nrf_rpc_tr_group {
-	int TODO;
+	uint8_t id;
 };
 
 
-typedef void (*nrf_rpc_tr_receive_handler)(struct nrf_rpc_tr_remote_ep *src_ep,
+typedef void (*nrf_rpc_tr_receive_handler)(struct nrf_rpc_tr_local_ep *dst_ep,
+					   struct nrf_rpc_tr_remote_ep *src_ep,
 					   const uint8_t *buf, size_t len);
 
-typedef uint32_t (*nrf_rpc_tr_filter)(struct nrf_rpc_tr_remote_ep *src_ep,
+typedef uint32_t (*nrf_rpc_tr_filter)(struct nrf_rpc_tr_local_ep *dst_ep,
+				      struct nrf_rpc_tr_remote_ep *src_ep,
 				      const uint8_t *buf, size_t len);
 
 
@@ -55,28 +80,28 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 
 #define nrf_rpc_tr_alloc_tx_buf(dst_ep, buf, len)                              \
 	ARG_UNUSED(dst_ep);                                                    \
-	u32_t _nrf_rpc_tr_buf_vla                                              \
-		[(sizeof(u32_t) - 1 + (len)) / sizeof(u32_t)];                 \
-	*(buf) = (u8_t *)(&_nrf_rpc_tr_buf_vla[0])
+	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 + (len)) / sizeof(u32_t)];\
+	*(buf) = ((u8_t *)(&_nrf_rpc_tr_buf_vla)) + NRF_RPC_TR_HEADER_SIZE
 
 #define nrf_rpc_tr_free_tx_buf(dst_ep, buf)
 
 #define nrf_rpc_tr_alloc_failed(buf) 0
 
-int nrf_rpc_tr_send(struct nrf_rpc_tr_remote_ep *dst_ep, const u8_t *buf,
+int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf,
 		    size_t len);
 
-int nrf_rpc_tr_read(struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf);
+int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf);
 
-void nrf_rpc_tr_release_buffer();
+void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep);
 
-struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(struct nrf_rpc_tr_group *group);
+struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(void);
 void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep);
 
-struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_default_dst_get();
-void nrf_rpc_tr_default_dst_set(struct nrf_rpc_tr_remote_ep *endpoint);
-
 struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get();
+
+
+void *nrf_rpc_thread_custom_data_get(void);
+void nrf_rpc_thread_custom_data_set(void *value);
 
 
 void printbuf(const char* text, const uint8_t *packet, size_t len); // TODO: delete
