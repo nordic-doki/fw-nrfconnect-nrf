@@ -12,9 +12,9 @@
 
 #define BUFFER_LENGTH 10
 
-/*static u8_t buffer[BUFFER_LENGTH];
+static u8_t buffer[BUFFER_LENGTH];
 
-static void async_callback(u8_t* buffer, size_t length)
+/*static void async_callback(u8_t* buffer, size_t length)
 {
 	size_t i;
 
@@ -39,8 +39,10 @@ void main(void)
 		return;
 	}
 
+	printk("Remote init send\n");
+
 	while (true) {
-		/*k_sleep(K_MSEC(1000));
+		k_sleep(K_MSEC(1000));
 		
 		err = entropy_remote_get(buffer, sizeof(buffer));
 		if (err) {
@@ -56,7 +58,7 @@ void main(void)
 
 		printk("\n");
 
-		k_sleep(K_MSEC(1000));
+		/*k_sleep(K_MSEC(1000));
 
 		err = entropy_remote_get_async(sizeof(buffer), async_callback);
 		if (err) {

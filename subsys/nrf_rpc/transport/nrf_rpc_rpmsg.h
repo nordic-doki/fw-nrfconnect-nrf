@@ -62,7 +62,7 @@ struct nrf_rpc_tr_local_ep {
 };
 
 struct nrf_rpc_tr_group {
-	uint8_t id;
+	uint8_t _TODO_SOMETHING;
 };
 
 
@@ -81,7 +81,7 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 
 #define nrf_rpc_tr_alloc_tx_buf(dst_ep, buf, len)                              \
 	ARG_UNUSED(dst_ep);                                                    \
-	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 + (len)) / sizeof(u32_t)];\
+	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 + ((len) + NRF_RPC_TR_HEADER_SIZE)) / sizeof(u32_t)];\
 	*(buf) = ((u8_t *)(&_nrf_rpc_tr_buf_vla)) + NRF_RPC_TR_HEADER_SIZE
 
 #define nrf_rpc_tr_free_tx_buf(dst_ep, buf)

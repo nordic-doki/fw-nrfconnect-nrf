@@ -30,7 +30,11 @@ int entropy_remote_init(void)
 	rp_err_t err;
 	uint8_t* packet;
 
+	printk("entropy_remote_init\n");
+
 	NRF_RPC_CMD_ALLOC(&entropy_group, &packet, 0, return -ENOMEM);
+
+	printbuf("entropy_remote_init", packet, 0);
 
 	err = NRF_RPC_CMD_SEND(&entropy_group, SER_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
 	if (err) {
@@ -40,12 +44,52 @@ int entropy_remote_init(void)
 	return result;
 }
 
-void entropy_remote_init_noerr(void)
+struct entropy_get_result {
+	u8_t *buffer;
+	u16_t length;
+	int result;
+};
+
+static rp_err_t entropy_get_rsp(const uint8_t *packet, size_t len,
+				  void* hander_data)
 {
-	uint8_t* packet;
-	NRF_RPC_CMD_ALLOC(&entropy_group, &packet, 0, return);
-	NRF_RPC_CMD_SEND_NOERR(&entropy_group, SER_COMMAND_ENTROPY_INIT, packet, 0, NULL, NULL);
+	struct entropy_get_result *result = (struct entropy_get_result *)hander_data;
+
+	if (len != sizeof(int) + result->length) {
+		return NRF_RPC_ERR_INTERNAL;
+	}
+	result->result = *(int *)&packet[0];
+
+	memcpy(result->buffer, &packet[sizeof(int)], result->length);
+
+	return NRF_RPC_SUCCESS;
 }
+
+int entropy_remote_get(u8_t *buffer, u16_t length)
+{
+	rp_err_t err;
+	uint8_t* packet;
+	struct entropy_get_result result = {
+		.buffer = buffer,
+		.length = length,
+	};
+
+	if (!buffer || length < 1) {
+		return -EINVAL;
+	}
+
+	NRF_RPC_CMD_ALLOC(&entropy_group, &packet, sizeof(uint16_t), return -ENOMEM);
+
+	*(uint16_t *)&packet[0] = length;
+
+	err = NRF_RPC_CMD_SEND(&entropy_group, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), entropy_get_rsp, &result);
+	if (err) {
+		return -EINVAL;
+	}
+
+	return result.result;
+}
+
 
 static int serialization_init(struct device *dev)
 {
@@ -53,10 +97,14 @@ static int serialization_init(struct device *dev)
 
 	rp_err_t err;
 
+	printk("Init begin\n");
+
 	err = nrf_rpc_init();
 	if (err) {
 		return -EINVAL;
 	}
+
+	printk("Init done\n");
 
 	return 0;
 }
@@ -87,24 +135,6 @@ static rp_err_t entropy_get_rsp(const uint8_t *packet, size_t packet_len)
 	memcpy(rsp_data.buffer, &packet[sizeof(int)], rsp_data.length);
 
 	return RP_SUCCESS;
-}
-
-int entropy_remote_init(void)
-{
-	rp_err_t err;
-
-	RP_SER_CMD_ALLOC(cmd_buf, &entropy_ser, 0);
-
-	if (RP_SER_ALLOC_FAILED(cmd_buf)) {
-		return -ENOMEM;
-	}
-
-	err = rp_ser_cmd_send(&entropy_ser, SER_COMMAND_ENTROPY_INIT, cmd_buf, 0, rsp_error_code_handle);
-	if (err) {
-		return -EINVAL;
-	}
-
-	return rsp_data.err_code;
 }
 
 int entropy_remote_get(u8_t *buffer, u16_t length)
