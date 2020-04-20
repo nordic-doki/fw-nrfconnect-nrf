@@ -11,6 +11,8 @@
 
 #include "../../ser_common.h"
 
+static void (*async_callback)(u8_t* buffer, size_t length);
+
 NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_FIRST);
 
 rp_err_t rsp_error_code_handle(const uint8_t *packet, size_t len,
@@ -90,6 +92,58 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 	return result.result;
 }
 
+int entropy_remote_get_async(u16_t length, void (*callback)(u8_t* buffer, size_t length))
+{
+	rp_err_t err;
+	uint8_t* packet;
+
+	if (length < 1 || callback == NULL) {
+		return -EINVAL;
+	}
+
+	NRF_RPC_EVT_ALLOC(&entropy_group, &packet, sizeof(uint16_t), return -ENOMEM);
+
+	*(uint16_t *)&packet[0] = length;
+
+	async_callback = callback;
+
+	err = NRF_RPC_EVT_SEND(&entropy_group, SER_EVENT_ENTROPY_GET_ASYNC, packet, sizeof(uint16_t));
+	if (err) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static rp_err_t entropy_get_result_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+{
+	int err;
+	size_t length;
+	u8_t buf[32];
+
+	if (packet_len < sizeof(int)) {
+		nrf_rpc_decoding_done();
+		return NRF_RPC_ERR_INTERNAL;
+	}
+	err = *(int *)&packet[0];
+	length = packet_len - sizeof(int);
+	if (length > sizeof(buf)) {
+		return NRF_RPC_ERR_NO_MEM;
+	}
+
+	memcpy(buf, &packet[sizeof(int)], length);
+
+	nrf_rpc_decoding_done();
+
+	if (async_callback != NULL) {
+		async_callback(buf, length);
+	}
+
+	return NRF_RPC_SUCCESS;
+}
+
+NRF_RPC_EVT_DECODER(entropy_group, entropy_get_result, SER_EVENT_ENTROPY_GET_ASYNC_RESULT,
+		   entropy_get_result_handler);
 
 static int serialization_init(struct device *dev)
 {

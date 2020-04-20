@@ -27,6 +27,8 @@ LOG_MODULE_REGISTER(trans_rpmsg);
 
 #define FLAG_FILTERED (0x80000000uL)
 
+#define CONTROL_EP_ADDR 0x7F
+
 #define HEADER_DST_INDEX 0
 #define HEADER_SRC_INDEX 1
 
@@ -34,6 +36,11 @@ static nrf_rpc_tr_receive_handler receive_callback = NULL;
 static nrf_rpc_tr_filter receive_filter = NULL;
 
 static struct rp_ll_endpoint ll_endpoint;
+
+struct nrf_rpc_tr_remote_ep nrf_rpc_tr_control_ep = {
+	.used = true,
+	.addr = CONTROL_EP_ADDR,
+};
 
 static struct nrf_rpc_remote_ep remote_pool[CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT];
 K_SEM_DEFINE(remote_pool_sem, 0, CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE);
@@ -94,18 +101,25 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	dst_addr = buf[HEADER_DST_INDEX];
 	src_addr = buf[HEADER_SRC_INDEX];
 
-	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
-		// TODO: report error
-		return;
-	}
-
 	if (src_addr >= CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT) {
 		// TODO: report error
 		return;
 	}
 
-	dst = &local_endpoints[dst_addr].tr_ep;
 	src = &remote_pool[src_addr].tr_ep;
+
+	if (dst_addr == CONTROL_EP_ADDR) {
+		filtered = receive_filter(NULL, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
+		__ASSERT(filtered, "All packets on control endpoint must be filtered");
+		return;
+	}
+
+	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
+		// TODO: report error
+		return;
+	}
+
+	dst = &local_endpoints[dst_addr].tr_ep;
 
 	filtered = receive_filter(dst, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
 
@@ -341,6 +355,8 @@ struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(void)
 
 void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep)
 {
+	printk("nrf_rpc_tr_remote_release %d\n", ep->addr);
+
 	k_mutex_lock(&remote_pool_mutex, K_FOREVER);
 
 	if (ep->used) {
