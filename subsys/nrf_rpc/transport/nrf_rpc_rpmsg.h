@@ -46,12 +46,10 @@ struct nrf_rpc_tr_remote_ep {
 	sys_snode_t node;
 	bool used;
 	uint8_t addr;
-	nrf_rpc_tr_addr_mask_t addr_mask;
 };
 
 struct nrf_rpc_tr_local_ep {
 	uint8_t addr;
-	nrf_rpc_tr_addr_mask_t addr_mask;
 	struct k_sem input_sem;
 	struct k_sem done_sem;
 	bool wait_for_done;

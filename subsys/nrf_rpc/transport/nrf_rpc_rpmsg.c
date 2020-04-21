@@ -199,7 +199,6 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 
 	for (i = 0; i < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT; i++) {
 		remote_pool[i].tr_ep.addr = i;
-		remote_pool[i].tr_ep.addr_mask = 1 << i;
 		if (i < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE) {
 			remote_pool[i].tr_ep.used = false;
 			sys_slist_append(&remote_pool_free, &remote_pool[i].tr_ep.node);
@@ -210,7 +209,6 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 	for (i = 0; i < CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE; i++) {
 		struct nrf_rpc_tr_local_ep *ep = &local_endpoints[i].tr_ep;
 		ep->addr = i;
-		ep->addr_mask = 1 << i;
 		k_sem_init(&ep->done_sem, 0, 1);
 		k_sem_init(&ep->input_sem, 0, 1);
 		k_thread_create(&pool_threads[i], pool_stacks[i],
@@ -307,7 +305,6 @@ struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 	k_thread_custom_data_set(ep);
 
 	ep->addr = new_index;
-	ep->addr_mask = (1 << new_index);
 	k_sem_init(&ep->done_sem, 0, 1);
 	k_sem_init(&ep->input_sem, 0, 1);
 
