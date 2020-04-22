@@ -86,7 +86,7 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	if (event == RP_LL_EVENT_CONNECTED) {
 		k_sem_give(&remote_pool_sem);
 		return;
-	} else if (event != RP_LL_EVENT_DATA || length < NRF_RPC_TR_HEADER_SIZE) {
+	} else if (event != RP_LL_EVENT_DATA || length < _NRF_RPC_TR_HEADER_SIZE) {
 		return;
 	}
 
@@ -102,13 +102,13 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	}
 
 	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
-		receive_filter(NULL, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
+		receive_filter(NULL, src, &buf[_NRF_RPC_TR_HEADER_SIZE], length - _NRF_RPC_TR_HEADER_SIZE);
 		return;
 	}
 
 	dst = &local_endpoints[dst_addr].tr_ep;
 
-	filtered = receive_filter(dst, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
+	filtered = receive_filter(dst, src, &buf[_NRF_RPC_TR_HEADER_SIZE], length - _NRF_RPC_TR_HEADER_SIZE);
 
 	if (dst->wait_for_done)
 	{
@@ -214,12 +214,12 @@ int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 		    size_t len)
 {
 	int err;
-	u8_t *full_packet = &buf[-NRF_RPC_TR_HEADER_SIZE];
+	u8_t *full_packet = &buf[-_NRF_RPC_TR_HEADER_SIZE];
 
 	full_packet[HEADER_DST_INDEX] = dst_ep ? dst_ep->addr : NULL_EP_ADDR;
 	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr : NULL_EP_ADDR;
 
-	err = rp_ll_send(&ll_endpoint, full_packet, len + NRF_RPC_TR_HEADER_SIZE);
+	err = rp_ll_send(&ll_endpoint, full_packet, len + _NRF_RPC_TR_HEADER_SIZE);
 
 	return translate_error(err);
 }
@@ -239,7 +239,7 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 	do {
 		k_sem_take(&local_ep->input_sem, K_FOREVER);
 		len = (uint32_t)atomic_set(&local_ep->input_length, (atomic_val_t)0);
-	} while (len < NRF_RPC_TR_HEADER_SIZE);
+	} while (len < _NRF_RPC_TR_HEADER_SIZE);
 
 	*src_ep = NULL;
 
@@ -253,8 +253,8 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 			*src_ep = &remote_pool[src_addr].tr_ep;
 		}
 		local_ep->buffer_owned = true;
-		*buf = local_ep->input_buffer + NRF_RPC_TR_HEADER_SIZE;
-		len -= NRF_RPC_TR_HEADER_SIZE;
+		*buf = local_ep->input_buffer + _NRF_RPC_TR_HEADER_SIZE;
+		len -= _NRF_RPC_TR_HEADER_SIZE;
 		printbuf("nrf_rpc_tr_read", *buf - 2, len + 2);
 	}
 
