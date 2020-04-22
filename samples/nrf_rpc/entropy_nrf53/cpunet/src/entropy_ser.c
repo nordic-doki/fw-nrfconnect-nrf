@@ -14,20 +14,21 @@
 
 #include "../../ser_common.h"
 
-NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_FIRST);
+NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_ID_FIRST);
 
 static struct device *entropy;
 
 static int rsp_error_code_send(int err_code)
 {
-	rp_err_t err;
-	uint8_t* packet;
+	int err;
+	uint8_t *packet;
+	struct nrf_rpc_remote_ep *ep;
 
-	NRF_RPC_RSP_ALLOC(&packet, sizeof(int), return -ENOMEM);
+	NRF_RPC_RSP_ALLOC(ep, packet, sizeof(int), return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 
-	err = NRF_RPC_RSP_SEND(packet, sizeof(int));
+	err = nrf_rpc_rsp_send(ep, packet, sizeof(int));
 	if (err) {
 		return -EINVAL;
 	}
@@ -35,7 +36,7 @@ static int rsp_error_code_send(int err_code)
 	return 0;
 }
 
-static rp_err_t entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+static int entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
 	int err;
 
@@ -61,15 +62,16 @@ NRF_RPC_CMD_DECODER(entropy_group, entropy_init, SER_COMMAND_ENTROPY_INIT,
 
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
-	rp_err_t err;
+	int err;
 	uint8_t* packet;
+	struct nrf_rpc_remote_ep *ep;
 
-	NRF_RPC_RSP_ALLOC(&packet, sizeof(int) + length, return -ENOMEM);
+	NRF_RPC_RSP_ALLOC(ep, packet, sizeof(int) + length, return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = NRF_RPC_RSP_SEND(packet, sizeof(int) + length);
+	err = nrf_rpc_rsp_send(ep, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -79,15 +81,16 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 
 static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 {
-	rp_err_t err;
+	int err;
 	uint8_t* packet;
+	struct nrf_rpc_remote_ep *ep;
 
-	NRF_RPC_EVT_ALLOC(&entropy_group, &packet, sizeof(int) + length, return -ENOMEM);
+	NRF_RPC_EVT_ALLOC(ep, &entropy_group, packet, sizeof(int) + length, return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = NRF_RPC_EVT_SEND(&entropy_group, SER_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
+	err = nrf_rpc_evt_send(ep, SER_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -95,7 +98,7 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-static rp_err_t entropy_get_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+static int entropy_get_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
 	int err;
 	uint16_t length;
@@ -143,7 +146,7 @@ static int serialization_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	rp_err_t err;
+	int err;
 
 	printk("Init begin\n");
 
@@ -167,7 +170,7 @@ static struct device *entropy;
 
 static int rsp_error_code_send(int err_code)
 {
-	rp_err_t err;
+	int err;
 
 	RP_SER_RSP_ALLOC(rsp_buf, &entropy_ser, sizeof(int));
 
@@ -187,7 +190,7 @@ static int rsp_error_code_send(int err_code)
 
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
-	rp_err_t err;
+	int err;
 
 	RP_SER_RSP_ALLOC(rsp_buf, &entropy_ser, sizeof(int) + length);
 
@@ -208,7 +211,7 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 
 static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 {
-	rp_err_t err;
+	int err;
 
 	RP_SER_EVT_ALLOC(rsp_buf, &entropy_ser, sizeof(int) + length);
 
@@ -227,7 +230,7 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-static rp_err_t entropy_init_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
+static int entropy_init_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
 {
 	int err;
 
@@ -248,7 +251,7 @@ static rp_err_t entropy_init_handler(uint8_t code, const uint8_t *packet, size_t
 	return RP_SUCCESS;
 }
 
-static rp_err_t entropy_get_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
+static int entropy_get_handler(uint8_t code, const uint8_t *packet, size_t packet_len)
 {
 	int err;
 	uint16_t length;
@@ -289,7 +292,7 @@ static int serialization_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	rp_err_t err;
+	int err;
 
 	err = rp_ser_init(&entropy_ser);
 	if (err) {

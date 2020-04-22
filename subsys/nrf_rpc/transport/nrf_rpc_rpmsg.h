@@ -62,14 +62,12 @@ struct nrf_rpc_tr_local_ep {
 
 typedef void (*nrf_rpc_tr_receive_handler)(struct nrf_rpc_tr_local_ep *dst_ep,
 					   struct nrf_rpc_tr_remote_ep *src_ep,
-					   const uint8_t *buf, size_t len);
+					   const uint8_t *buf, int len);
 
 typedef uint32_t (*nrf_rpc_tr_filter)(struct nrf_rpc_tr_local_ep *dst_ep,
 				      struct nrf_rpc_tr_remote_ep *src_ep,
-				      const uint8_t *buf, size_t len);
+				      const uint8_t *buf, int len);
 
-/* Special endpoint for packets that are not directed to specific endpoint */
-extern struct nrf_rpc_tr_remote_ep nrf_rpc_tr_control_ep;
 
 int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 		    nrf_rpc_tr_filter filter);

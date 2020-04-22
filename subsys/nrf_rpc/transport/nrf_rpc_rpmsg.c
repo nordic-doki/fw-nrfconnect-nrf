@@ -15,42 +15,36 @@
 
 #include <logging/log.h>
 
-#ifndef CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE   // TODO: delete
-#define CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE 8
-#define CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE 7
-#define CONFIG_NRF_RPC_EXTRA_EP_COUNT 9
-#define CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT 12
-#define CONFIG_NRF_RPC_LOCAL_THREAD_STACK_SIZE 2048
-#endif
-
 LOG_MODULE_REGISTER(trans_rpmsg);
 
 #define FLAG_FILTERED (0x80000000uL)
 
-#define CONTROL_EP_ADDR 0x7F
+#define NULL_EP_ADDR 0x7F
 
 #define HEADER_DST_INDEX 0
 #define HEADER_SRC_INDEX 1
 
-static nrf_rpc_tr_receive_handler receive_callback = NULL;
-static nrf_rpc_tr_filter receive_filter = NULL;
+static nrf_rpc_tr_receive_handler receive_callback;
+static nrf_rpc_tr_filter receive_filter;
 
 static struct rp_ll_endpoint ll_endpoint;
 
-struct nrf_rpc_tr_remote_ep nrf_rpc_tr_control_ep = {
-	.used = true,
-	.addr = CONTROL_EP_ADDR,
-};
-
-static struct nrf_rpc_remote_ep remote_pool[CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT];
+static struct nrf_rpc_remote_ep remote_pool[
+	CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE +
+	CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT];
 K_SEM_DEFINE(remote_pool_sem, 0, CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE);
 K_MUTEX_DEFINE(remote_pool_mutex);
 static sys_slist_t remote_pool_free = SYS_SLIST_STATIC_INIT(&remote_pool_free);
 
-static struct nrf_rpc_local_ep local_endpoints[CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT];
-static atomic_t next_free_extra_ep = ATOMIC_INIT(CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE);
+static struct nrf_rpc_local_ep local_endpoints[
+	CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE +
+	CONFIG_NRF_RPC_EXTRA_EP_COUNT];
+static atomic_t next_free_extra_ep =
+	ATOMIC_INIT(CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE);
 
-static K_THREAD_STACK_ARRAY_DEFINE(pool_stacks, CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE, CONFIG_NRF_RPC_LOCAL_THREAD_STACK_SIZE);
+static K_THREAD_STACK_ARRAY_DEFINE(pool_stacks,
+	CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE,
+	CONFIG_NRF_RPC_LOCAL_THREAD_STACK_SIZE);
 struct k_thread pool_threads[CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE];
 
 
@@ -101,21 +95,14 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	dst_addr = buf[HEADER_DST_INDEX];
 	src_addr = buf[HEADER_SRC_INDEX];
 
-	if (src_addr >= CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT) {
-		// TODO: report error
-		return;
-	}
-
-	src = &remote_pool[src_addr].tr_ep;
-
-	if (dst_addr == CONTROL_EP_ADDR) {
-		filtered = receive_filter(NULL, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
-		__ASSERT(filtered, "All packets on control endpoint must be filtered");
-		return;
+	if (src_addr < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE + CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT) {
+		src = &remote_pool[src_addr].tr_ep;
+	} else {
+		src = NULL;
 	}
 
 	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
-		// TODO: report error
+		receive_filter(NULL, src, &buf[NRF_RPC_TR_HEADER_SIZE], length - NRF_RPC_TR_HEADER_SIZE);
 		return;
 	}
 
@@ -229,8 +216,8 @@ int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 	int err;
 	u8_t *full_packet = &buf[-NRF_RPC_TR_HEADER_SIZE];
 
-	full_packet[HEADER_DST_INDEX] = dst_ep->addr;
-	full_packet[HEADER_SRC_INDEX] = local_ep->addr;
+	full_packet[HEADER_DST_INDEX] = dst_ep ? dst_ep->addr : NULL_EP_ADDR;
+	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr : NULL_EP_ADDR;
 
 	err = rp_ll_send(&ll_endpoint, full_packet, len + NRF_RPC_TR_HEADER_SIZE);
 
@@ -254,17 +241,17 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 		len = (uint32_t)atomic_set(&local_ep->input_length, (atomic_val_t)0);
 	} while (len < NRF_RPC_TR_HEADER_SIZE);
 
+	*src_ep = NULL;
+
 	if (len & FLAG_FILTERED) {
 		k_sem_give(&local_ep->done_sem);
 		*buf = NULL;
 		len ^= FLAG_FILTERED;
 	} else {
 		src_addr = local_ep->input_buffer[HEADER_SRC_INDEX];
-		if (src_addr >= ARRAY_SIZE(remote_pool)) {
-			//TODO: error
-			return NRF_RPC_ERR_INTERNAL;
+		if (src_addr < ARRAY_SIZE(remote_pool)) {
+			*src_ep = &remote_pool[src_addr].tr_ep;
 		}
-		*src_ep = &remote_pool[src_addr].tr_ep;
 		local_ep->buffer_owned = true;
 		*buf = local_ep->input_buffer + NRF_RPC_TR_HEADER_SIZE;
 		len -= NRF_RPC_TR_HEADER_SIZE;
@@ -356,7 +343,7 @@ void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep)
 
 	k_mutex_lock(&remote_pool_mutex, K_FOREVER);
 
-	if (ep->used) {
+	if (ep != NULL && ep->used) {
 		ep->used = false;
 		sys_slist_append(&remote_pool_free, &ep->node);
 		k_mutex_unlock(&remote_pool_mutex);
