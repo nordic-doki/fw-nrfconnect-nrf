@@ -36,6 +36,7 @@ int entropy_remote_init(void);
  *           Otherwise, a (negative) error code is returned.
  */
 int entropy_remote_get(u8_t *buffer, u16_t length);
+int entropy_remote_get_inline(u8_t *buffer, u16_t length);
 
 /**@brief Function for getting entropy value from the remote driver.
  *

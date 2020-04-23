@@ -94,6 +94,38 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 	return result.result;
 }
 
+int entropy_remote_get_inline(u8_t *buffer, u16_t length)
+{
+	int err;
+	uint8_t* packet;
+	struct nrf_rpc_remote_ep *ep;
+	const uint8_t *rsp;
+	size_t rsp_len;
+	int result;
+
+	if (!buffer || length < 1) {
+		return -EINVAL;
+	}
+
+	NRF_RPC_CMD_ALLOC(ep, &entropy_group, packet, sizeof(uint16_t), return -ENOMEM);
+
+	*(uint16_t *)&packet[0] = length;
+
+	err = nrf_rpc_cmd_rsp_send(ep, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), &rsp, &rsp_len);
+	if (err) {
+		return -EINVAL;
+	}
+
+	if (rsp_len != sizeof(int) + length) {
+		return NRF_RPC_ERR_INTERNAL;
+	}
+	result = *(int *)&rsp[0];
+
+	memcpy(buffer, &rsp[sizeof(int)], length);
+
+	return result;
+}
+
 int entropy_remote_get_async(u16_t length, void (*callback)(u8_t* buffer, size_t length))
 {
 	int err;
