@@ -22,13 +22,13 @@ static int rsp_error_code_send(int err_code)
 {
 	int err;
 	uint8_t *packet;
-	struct nrf_rpc_remote_ep *ep;
+	nrf_rpc_cmd_ctx_t ctx;
 
-	NRF_RPC_RSP_ALLOC(ep, packet, sizeof(int), return -ENOMEM);
+	NRF_RPC_RSP_ALLOC(ctx, packet, sizeof(int), return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 
-	err = nrf_rpc_rsp_send(ep, packet, sizeof(int));
+	err = nrf_rpc_rsp_send(ctx, packet, sizeof(int));
 	if (err) {
 		return -EINVAL;
 	}
@@ -63,15 +63,15 @@ NRF_RPC_CMD_DECODER(entropy_group, entropy_init, SER_COMMAND_ENTROPY_INIT,
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
 	int err;
-	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	uint8_t *packet;
+	nrf_rpc_cmd_ctx_t ctx;
 
-	NRF_RPC_RSP_ALLOC(ep, packet, sizeof(int) + length, return -ENOMEM);
+	NRF_RPC_RSP_ALLOC(ctx, packet, sizeof(int) + length, return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_rsp_send(ep, packet, sizeof(int) + length);
+	err = nrf_rpc_rsp_send(ctx, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -82,15 +82,15 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 {
 	int err;
-	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	uint8_t *packet;
+	nrf_rpc_cmd_ctx_t ctx;
 
-	NRF_RPC_EVT_ALLOC(ep, &entropy_group, packet, sizeof(int) + length, return -ENOMEM);
+	NRF_RPC_EVT_ALLOC(ctx, &entropy_group, packet, sizeof(int) + length, return -ENOMEM);
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_evt_send(ep, SER_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
+	err = nrf_rpc_evt_send(ctx, SER_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -121,7 +121,7 @@ static int entropy_get_handler(const uint8_t *packet, size_t packet_len, void* h
 
 	err = entropy_get_entropy(entropy, buf, length);
 
-	if (decoder->code == SER_EVENT_ENTROPY_GET_ASYNC) {
+	if (decoder->id == SER_EVENT_ENTROPY_GET_ASYNC) {
 		printk("SER_EVENT_ENTROPY_GET_ASYNC\n");
 		err = entropy_get_result_evt(err, buf, length);
 	} else {

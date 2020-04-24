@@ -31,15 +31,11 @@ int entropy_remote_init(void)
 	int result;
 	int err;
 	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	nrf_rpc_cmd_ctx_t ctx;
 
-	printk("entropy_remote_init\n");
+	NRF_RPC_CMD_ALLOC(ctx, &entropy_group, packet, 0, return -ENOMEM);
 
-	NRF_RPC_CMD_ALLOC(ep, &entropy_group, packet, 0, return -ENOMEM);
-
-	printbuf("entropy_remote_init", packet, 0);
-
-	err = nrf_rpc_cmd_send(ep, SER_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
+	err = nrf_rpc_cmd_send(ctx, SER_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
 	if (err) {
 		return -EINVAL;
 	}
@@ -72,7 +68,7 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 {
 	int err;
 	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	nrf_rpc_cmd_ctx_t ctx;
 	struct entropy_get_result result = {
 		.buffer = buffer,
 		.length = length,
@@ -82,11 +78,11 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 		return -EINVAL;
 	}
 
-	NRF_RPC_CMD_ALLOC(ep, &entropy_group, packet, sizeof(uint16_t), return -ENOMEM);
+	NRF_RPC_CMD_ALLOC(ctx, &entropy_group, packet, sizeof(uint16_t), return -ENOMEM);
 
 	*(uint16_t *)&packet[0] = length;
 
-	err = nrf_rpc_cmd_send(ep, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), entropy_get_rsp, &result);
+	err = nrf_rpc_cmd_send(ctx, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), entropy_get_rsp, &result);
 	if (err) {
 		return -EINVAL;
 	}
@@ -98,7 +94,7 @@ int entropy_remote_get_inline(u8_t *buffer, u16_t length)
 {
 	int err;
 	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	nrf_rpc_cmd_ctx_t ctx;
 	const uint8_t *rsp;
 	size_t rsp_len;
 	int result;
@@ -107,11 +103,11 @@ int entropy_remote_get_inline(u8_t *buffer, u16_t length)
 		return -EINVAL;
 	}
 
-	NRF_RPC_CMD_ALLOC(ep, &entropy_group, packet, sizeof(uint16_t), return -ENOMEM);
+	NRF_RPC_CMD_ALLOC(ctx, &entropy_group, packet, sizeof(uint16_t), return -ENOMEM);
 
 	*(uint16_t *)&packet[0] = length;
 
-	err = nrf_rpc_cmd_rsp_send(ep, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), &rsp, &rsp_len);
+	err = nrf_rpc_cmd_rsp_send(ctx, SER_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), &rsp, &rsp_len);
 	if (err) {
 		return -EINVAL;
 	}
@@ -123,6 +119,8 @@ int entropy_remote_get_inline(u8_t *buffer, u16_t length)
 
 	memcpy(buffer, &rsp[sizeof(int)], length);
 
+	nrf_rpc_decoding_done();
+
 	return result;
 }
 
@@ -130,7 +128,7 @@ int entropy_remote_get_async(u16_t length, void (*callback)(u8_t* buffer, size_t
 {
 	int err;
 	uint8_t* packet;
-	struct nrf_rpc_remote_ep *ep;
+	struct nrf_rpc_tr_remote_ep *ep;
 
 	if (length < 1 || callback == NULL) {
 		return -EINVAL;

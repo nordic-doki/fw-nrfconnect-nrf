@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define NRF_RPC_LOG_MODULE NRF_RPC_TR
+#include <nrf_rpc_log.h>
+
 #include <zephyr.h>
 #include <errno.h>
 
@@ -12,10 +15,6 @@
 #include "rp_ll.h"
 #include "nrf_rpc.h"
 #include "nrf_rpc_rpmsg.h"
-
-#include <logging/log.h>
-
-LOG_MODULE_REGISTER(trans_rpmsg);
 
 #define FLAG_FILTERED (0x80000000uL)
 
@@ -86,11 +85,11 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	if (event == RP_LL_EVENT_CONNECTED) {
 		k_sem_give(&remote_pool_sem);
 		return;
-	} else if (event != RP_LL_EVENT_DATA || length < _NRF_RPC_TR_HEADER_SIZE) {
+	} else if (event != RP_LL_EVENT_DATA || length < NRF_RPC_TR_MAX_HEADER_SIZE) {
 		return;
 	}
 
-	printbuf("ll_event_handler", buf, length);
+	//printbuf("ll_event_handler", buf, length);
 
 	dst_addr = buf[HEADER_DST_INDEX];
 	src_addr = buf[HEADER_SRC_INDEX];
@@ -102,13 +101,13 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	}
 
 	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE + CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
-		receive_filter(NULL, src, &buf[_NRF_RPC_TR_HEADER_SIZE], length - _NRF_RPC_TR_HEADER_SIZE);
+		receive_filter(NULL, src, &buf[NRF_RPC_TR_MAX_HEADER_SIZE], length - NRF_RPC_TR_MAX_HEADER_SIZE);
 		return;
 	}
 
 	dst = &local_endpoints[dst_addr].tr_ep;
 
-	filtered = receive_filter(dst, src, &buf[_NRF_RPC_TR_HEADER_SIZE], length - _NRF_RPC_TR_HEADER_SIZE);
+	filtered = receive_filter(dst, src, &buf[NRF_RPC_TR_MAX_HEADER_SIZE], length - NRF_RPC_TR_MAX_HEADER_SIZE);
 
 	if (dst->wait_for_done)
 	{
@@ -210,16 +209,26 @@ error_exit:
 	return translate_error(err);
 }
 
+#define DUMP_LIMITED_DBG(memory, len, text) do {			       \
+	if ((len) > 32) {						       \
+		NRF_RPC_DUMP_DBG(memory, 32, text " (truncated)");	       \
+	} else {							       \
+		NRF_RPC_DUMP_DBG(memory, (len), text);			       \
+	}								       \
+} while (0)
+
 int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf,
 		    size_t len)
 {
 	int err;
-	u8_t *full_packet = &buf[-_NRF_RPC_TR_HEADER_SIZE];
+	u8_t *full_packet = &buf[-NRF_RPC_TR_MAX_HEADER_SIZE];
 
 	full_packet[HEADER_DST_INDEX] = dst_ep ? dst_ep->addr : NULL_EP_ADDR;
 	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr : NULL_EP_ADDR;
 
-	err = rp_ll_send(&ll_endpoint, full_packet, len + _NRF_RPC_TR_HEADER_SIZE);
+	DUMP_LIMITED_DBG(full_packet, len + NRF_RPC_TR_MAX_HEADER_SIZE, "Send");
+
+	err = rp_ll_send(&ll_endpoint, full_packet, len + NRF_RPC_TR_MAX_HEADER_SIZE);
 
 	return translate_error(err);
 }
@@ -239,7 +248,7 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 	do {
 		k_sem_take(&local_ep->input_sem, K_FOREVER);
 		len = (uint32_t)atomic_set(&local_ep->input_length, (atomic_val_t)0);
-	} while (len < _NRF_RPC_TR_HEADER_SIZE);
+	} while (len < NRF_RPC_TR_MAX_HEADER_SIZE);
 
 	*src_ep = NULL;
 
@@ -253,9 +262,9 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 			*src_ep = &remote_pool[src_addr].tr_ep;
 		}
 		local_ep->buffer_owned = true;
-		*buf = local_ep->input_buffer + _NRF_RPC_TR_HEADER_SIZE;
-		len -= _NRF_RPC_TR_HEADER_SIZE;
-		printbuf("nrf_rpc_tr_read", *buf - 2, len + 2);
+		*buf = local_ep->input_buffer + NRF_RPC_TR_MAX_HEADER_SIZE;
+		len -= NRF_RPC_TR_MAX_HEADER_SIZE;
+		//printbuf("nrf_rpc_tr_read", *buf - 2, len + 2);
 	}
 
 	printk("nrf_rpc_tr_read DONE %d  %08X\n", len, (int)k_current_get());
@@ -265,7 +274,7 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 
 void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep)
 {
-	if (local_ep->buffer_owned) {
+	if (local_ep != NULL && local_ep->buffer_owned) {
 		local_ep->buffer_owned = false;
 		k_sem_give(&local_ep->done_sem);
 	}
@@ -351,15 +360,4 @@ void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep)
 	} else {
 		k_mutex_unlock(&remote_pool_mutex);
 	}
-}
-
-
-void printbuf(const char* text, const uint8_t *packet, size_t len)
-{
-	printk("%s ", text);
-	for (size_t i = 0; i < len; i++)
-	{
-		printk("  %02X", packet[i]);
-	}
-	printk("\n");
 }

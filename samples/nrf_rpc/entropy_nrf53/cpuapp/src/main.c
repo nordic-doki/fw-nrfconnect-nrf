@@ -42,8 +42,8 @@ void main(void)
 	printk("Remote init send\n");
 
 	while (true) {
-#if 0
-		k_sleep(K_MSEC(1000));
+#if 1
+		k_sleep(K_MSEC(5000));
 		
 		err = entropy_remote_get(buffer, sizeof(buffer));
 		if (err) {
@@ -60,15 +60,15 @@ void main(void)
 		printk("\n");
 #endif
 #if 1
-		k_sleep(K_MSEC(1000));
+		k_sleep(K_MSEC(5000));
 		
-		err = entropy_remote_get_inline(buffer, sizeof(buffer));
+		err = entropy_remote_get(buffer, sizeof(buffer));
 		if (err) {
 			printk("Entropy remote get failed: %d\n", err);
 			continue;
 		}
 
-		printk("sync ");
+		printk("inline ");
 
 		for (int i = 0; i < BUFFER_LENGTH; i++) {
 			printk("  0x%02x", buffer[i]);
@@ -76,8 +76,8 @@ void main(void)
 
 		printk("\n");
 #endif
-#if 0
-		k_sleep(K_MSEC(1000));
+#if 1
+		k_sleep(K_MSEC(5000));
 
 		err = entropy_remote_get_async(sizeof(buffer), async_callback);
 		if (err) {

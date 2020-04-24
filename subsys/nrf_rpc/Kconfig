@@ -80,8 +80,12 @@ config RP_TRANS_PRMSG_RX_PRIORITY
 	  Priority of the thread that is responsible for receiving incoming
 	  messages from rpmsg.
 
-module = RP_SER
-module-str = RP_SER
+module = NRF_RPC
+module-str = NRF_RPC_
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+module = NRF_RPC_TR
+module-str = NRF_RPC_TR
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
 endif # NRF_RPC
