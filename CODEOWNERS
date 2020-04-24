@@ -85,6 +85,8 @@ Kconfig*                                  @tejlmand
 /samples/mpsl/**/*.rst                    @b-gent
 /samples/nfc/                             @grochu
 /samples/nfc/**/README.rst                @b-gent
+/samples/nrf_rpc/                         @doki-nordic @KAGA164
+/samples/nrf_rpc/**/README.rst            @b-gent
 /samples/nrf5340/empty_app_core/          @doki-nordic
 /samples/nrf5340/**/README.rst            @b-gent
 /samples/nrf9160/                         @rlubos @lemrey
@@ -114,6 +116,7 @@ Kconfig*                                  @tejlmand
 /subsys/mpsl/                             @joerchan @rugeGerritsen
 /subsys/net/                              @rlubos
 /subsys/nfc/                              @grochu @anangl
+/subsys/nrf_rpc/                          @doki-nordic @KAGA164
 /subsys/partition_manager/                @hakonfam
 /subsys/profiler/                         @pdunaj
 /subsys/shell/                            @nordic-krch
