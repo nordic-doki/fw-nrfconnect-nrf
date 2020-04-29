@@ -30,6 +30,7 @@
 extern "C" {
 #endif
 
+
 #define NRF_RPC_TR_MAX_HEADER_SIZE 2
 
 
@@ -64,31 +65,50 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 		    nrf_rpc_tr_filter filter);
 
 
-#define nrf_rpc_tr_alloc_tx_buf(dst_ep, buf, len)                              \
-	ARG_UNUSED(dst_ep);                                                    \
-	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 + ((len) + NRF_RPC_TR_MAX_HEADER_SIZE)) / sizeof(u32_t)];\
+#define nrf_rpc_tr_alloc_tx_buf(dst_ep, buf, len)			       \
+	ARG_UNUSED(dst_ep);						       \
+	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 +			       \
+				   ((len) + NRF_RPC_TR_MAX_HEADER_SIZE)) /     \
+				  sizeof(u32_t)];			       \
 	*(buf) = ((u8_t *)(&_nrf_rpc_tr_buf_vla)) + NRF_RPC_TR_MAX_HEADER_SIZE
 
 #define nrf_rpc_tr_free_tx_buf(dst_ep, buf)
 
 #define nrf_rpc_tr_alloc_failed(buf) 0
 
-int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf,
-		    size_t len);
+int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep,
+		    struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf, size_t len);
 
-int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf);
+int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep,
+		    struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf);
 
 void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep);
 
 struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(void);
+
 void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep);
 
 struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get();
 
+/** @brief Sets thread custom that.
+ * 
+ * This transport is using thread custom data to keep local endpoint
+ * information. It may collide if thread custom data is used somewhere else.
+ * This function wraps Zephyr's function, so it can be used safely.
+ * 
+ * @param value Value of thread custom data.
+ */
+void nrf_rpc_tr_thread_custom_data_set(void *value);
 
-void *nrf_rpc_thread_custom_data_get(void);
-void nrf_rpc_thread_custom_data_set(void *value);
-
+/** @brief Gets thread custom that.
+ * 
+ * This transport is using thread custom data to keep local endpoint
+ * information. It may collide if thread custom data is used somewhere else.
+ * This function wraps Zephyr's function, so it can be used safely. 
+ * 
+ * @returns Thread custom data.
+ */
+void *nrf_rpc_tr_thread_custom_data_get(void);
 
 #ifdef __cplusplus
 }
