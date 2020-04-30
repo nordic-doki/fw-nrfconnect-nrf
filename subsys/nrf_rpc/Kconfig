@@ -8,51 +8,64 @@ menu "nRF RPC (Remote Procedure Call) library"
 
 if NRF_RPC
 
-config NRF_RPC_EXTRA_EP_COUNT
+menu "Local endpoints options"
+
+config NRF_RPC_LOCAL_EXTRA_EP_COUNT
 	int "Number of extra local endpoints"
-	default 0
+	range 1 32
+	default 3
 	help
 	  Number of extra local endpoints. This value corresponds to endpoints
 	  allocated for user threads not counting endpoints for thread pool.
-	  Value 0 indicates that extra endpoint will be dynamically allocated
-	  if needed.
-
-menu "Local thread pool options"
+	  This value must be the same as NRF_RPC_REMOTE_EXTRA_EP_COUNT on the
+	  remote side.
 
 config NRF_RPC_LOCAL_THREAD_POOL_SIZE
 	int "Number of threads in local thread pool"
-	range 1 8
+	range 1 31
 	default 3
+	help
+	  Number of threads in local thread pool.
+	  This value must be the same as NRF_RPC_REMOTE_THREAD_POOL_SIZE on the
+	  remote side.
+
 
 config NRF_RPC_LOCAL_THREAD_STACK_SIZE
 	int "Stack size of thread from thread pool"
 	default 1024
+	help
+	  Stack size for each thread in local thread pool.
 
 config NRF_RPC_LOCAL_THREAD_PRIORITY
 	int "Priority of thread from thread pool"
 	default 2
+	help
+	  Thread priority of each thread in local thread pool.
 
 endmenu
 
-menu "Remote thread pool options"
-
-config NRF_RPC_REMOTE_THREAD_POOL_SIZE
-	int "Number of threads in remote thread pool"
-	range 1 8
-	default 3
+menu "Remote endpoints options"
 
 config NRF_RPC_REMOTE_EXTRA_EP_COUNT
 	int "Number of extra remote endpoints"
-	range 1 8
+	range 1 32
 	default 3
+	help
+	  Number of extra remote endpoints. This value corresponds to endpoints
+	  allocated for user threads not counting endpoints for thread pool.
+	  This value must be the same as NRF_RPC_LOCAL_EXTRA_EP_COUNT on the
+	  remote side.
+
+config NRF_RPC_REMOTE_THREAD_POOL_SIZE
+	int "Number of threads in remote thread pool"
+	range 1 31
+	default 3
+	help
+	  Number of threads in remote thread pool.
+	  This value must be the same as NRF_RPC_LOCAL_THREAD_POOL_SIZE on the
+	  remote side.
 
 endmenu
-
-config RP_OS_RSP_WAIT_TIME
-	int "Remote procedure response wait time"
-	default 5000
-	help
-	  Remote procedure wait for response maximum time in miliseconds
 
 choice
 	prompt "RPMSG device role"
@@ -60,20 +73,26 @@ choice
 
 config RPMSG_REMOTE
 	bool "Remote"
+	help
+	  Selects RPMsg role as "Remote". The other side must be configured as
+	  "Master".
 
 config RPMSG_MASTER
 	bool "Master"
+	help
+	  Selects RPMsg role as "Master". The other side must be configured as
+	  "Remote".
 
 endchoice
 
-config RP_TRANS_PRMSG_RX_STACK_SIZE
+config NRF_RPC_TR_PRMSG_RX_STACK_SIZE
 	int "Stack size of the rpmsg receive thread"
 	default 1536
 	help
 	  Stack size for the thread that is responsible for receiving incoming
 	  messages from rpmsg.
 
-config RP_TRANS_PRMSG_RX_PRIORITY
+config NRF_RPC_TR_PRMSG_RX_PRIORITY
 	int "Priority of the rpmsg receive thread"
 	default -1
 	help

@@ -72,7 +72,7 @@ K_MUTEX_DEFINE(remote_pool_mutex);
  */
 static struct nrf_rpc_local_ep local_endpoints[
 	CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE +
-	CONFIG_NRF_RPC_EXTRA_EP_COUNT];
+	CONFIG_NRF_RPC_LOCAL_EXTRA_EP_COUNT];
 
 /* Contains next available local endpoint instance in local_endpoints. */
 static atomic_t next_free_extra_ep =
@@ -157,7 +157,7 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	}
 
 	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE +
-		        CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
+		        CONFIG_NRF_RPC_LOCAL_EXTRA_EP_COUNT) {
 		/* Packet directed to null endpoint cannot be passed to specific
 		 * thread, so only filter callback is possible. */
 		receive_filter(NULL, src, &buf[NRF_RPC_TR_MAX_HEADER_SIZE],
