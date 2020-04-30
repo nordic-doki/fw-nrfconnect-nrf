@@ -128,8 +128,10 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	if (event == RP_LL_EVENT_CONNECTED) {
 
 		/* remote_pool_sem is also used during initialization to
-		 * wait of a connection before exiting nRF RPC init function.
+		 * wait for a valid connection before exiting nRF RPC init
+		 * function.
 		 */
+		NRF_RPC_DBG("nRF RPC Connected");
 		k_sem_give(&remote_pool_sem);
 		return;
 
@@ -140,8 +142,12 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 
 	}
 
+	NRF_RPC_ASSERT(buf != NULL);
+
 	dst_addr = buf[HEADER_DST_INDEX];
 	src_addr = buf[HEADER_SRC_INDEX];
+
+	NRF_RPC_DBG("Received data from EP[%d] to EP[%d]", src_addr, dst_addr);
 
 	if (src_addr < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE +
 		       CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT) {
@@ -206,7 +212,11 @@ static void thread_pool_entry(void *p1, void *p2, void *p3)
 	const uint8_t *buf;
 	int len;
 
+	NRF_RPC_ASSERT(local_ep != NULL);
+
 	k_thread_custom_data_set(local_ep);
+
+	NRF_RPC_DBG("Starting thread to handle EP[%d]", local_ep->addr);
 
 	do {
 		len = nrf_rpc_tr_read(local_ep, &src, &buf);
@@ -221,6 +231,9 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 	uint32_t i;
 	int err = 0;
 
+	NRF_RPC_ASSERT(callback != NULL);
+	NRF_RPC_ASSERT(filter != NULL);
+
 	receive_callback = callback;
 	receive_filter = filter;
 
@@ -230,7 +243,7 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 	if (err != 0) {
 		goto error_exit;
 	}
-	
+
 	err = rp_ll_endpoint_init(&ll_endpoint, 1, ll_event_handler, NULL);
 	if (err != 0) {
 		goto error_exit;
@@ -240,7 +253,7 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 
 	for (i = 0; i < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE +
 			CONFIG_NRF_RPC_REMOTE_EXTRA_EP_COUNT; i++) {
-				
+
 		remote_pool[i].tr_ep.addr = i;
 		if (i < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE) {
 			remote_pool[i].tr_ep.used = false;
@@ -261,8 +274,16 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 			CONFIG_NRF_RPC_LOCAL_THREAD_PRIORITY, 0, K_NO_WAIT);
 	}
 
+
 error_exit:
 	k_mutex_unlock(&remote_pool_mutex);
+
+	if (err >= 0) {
+		NRF_RPC_DBG("nRF RPC Initialized");
+	} else {
+		NRF_RPC_DBG("nRF RPC Initialization error %d", err);
+	}
+
 	return translate_error(err);
 }
 
@@ -273,8 +294,14 @@ int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 	int err;
 	u8_t *full_packet = &buf[-NRF_RPC_TR_MAX_HEADER_SIZE];
 
+	NRF_RPC_ASSERT(buf != NULL);
+
 	full_packet[HEADER_DST_INDEX] = dst_ep ? dst_ep->addr : NULL_EP_ADDR;
 	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr : NULL_EP_ADDR;
+
+	NRF_RPC_DBG("Sending from EP[%d] to EP[%d]",
+		    full_packet[HEADER_SRC_INDEX],
+		    full_packet[HEADER_DST_INDEX]);
 
 	DUMP_LIMITED_DBG(full_packet, len + NRF_RPC_TR_MAX_HEADER_SIZE, "Send");
 
@@ -334,15 +361,15 @@ int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep)
 {
 	if (local_ep != NULL && local_ep->buffer_owned) {
-		NRF_RPC_DBG("Read filtered %d", len);
+		NRF_RPC_DBG("Buffer released for EP[%d]", local_ep->addr);
 		local_ep->buffer_owned = false;
 		k_sem_give(&local_ep->done_sem);
 	}
 }
 
+
 struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 {
-	// TODO: not using thread custom data
 	struct nrf_rpc_tr_local_ep *ep = (struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
 
 	if (ep >= &local_endpoints[0].tr_ep && ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
@@ -352,7 +379,11 @@ struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 	atomic_val_t new_index = atomic_inc(&next_free_extra_ep);
 
 	if (new_index >= ARRAY_SIZE(local_endpoints)) {
-		// TODO: fatal error OR assert
+		NRF_RPC_ERR("No more free endpoints in local pool");
+		NRF_RPC_ASSERT(!"No more free endpoints in local pool");
+		/* In case if asserts are disabled. */
+		k_oops();
+		/* Unreachable code */
 		return NULL;
 	}
 
@@ -364,8 +395,12 @@ struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 	k_sem_init(&ep->done_sem, 0, 1);
 	k_sem_init(&ep->input_sem, 0, 1);
 
+	NRF_RPC_DBG("Local EP[%d] assigned to thread 0x%08X", ep->addr,
+		    (uint32_t)k_current_get());
+
 	return ep;
 }
+
 
 void *nrf_rpc_tr_thread_custom_data_get(void)
 {
@@ -378,21 +413,28 @@ void *nrf_rpc_tr_thread_custom_data_get(void)
 	return ep;
 }
 
+
 void nrf_rpc_tr_thread_custom_data_set(void *value)
 {
 	struct nrf_rpc_tr_local_ep *ep = (struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
 
 	if (ep >= &local_endpoints[0].tr_ep && ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
 		ep->custom_data = value;
+		return;
 	}
 
 	k_thread_custom_data_set(value);
 }
 
+
 struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(void)
 {
 	sys_snode_t *node;
 	struct nrf_rpc_tr_remote_ep *ep;
+
+	if (k_sem_count_get(&remote_pool_sem) == 0) {
+		NRF_RPC_DBG("All remote threads reserved. Waiting...");
+	}
 
 	k_sem_take(&remote_pool_sem, K_FOREVER);
 	k_mutex_lock(&remote_pool_mutex, K_FOREVER);
@@ -402,20 +444,22 @@ struct nrf_rpc_tr_remote_ep *nrf_rpc_tr_remote_reserve(void)
 	ep->used = true;
 
 	k_mutex_unlock(&remote_pool_mutex);
-	
+
+	NRF_RPC_DBG("Remote EP[%d] reserved", ep->addr);
+
 	return ep;
 }
 
+
 void nrf_rpc_tr_remote_release(struct nrf_rpc_tr_remote_ep *ep)
 {
-	printk("nrf_rpc_tr_remote_release %d\n", ep->addr);
-
 	k_mutex_lock(&remote_pool_mutex, K_FOREVER);
 
 	if (ep != NULL && ep->used) {
 		ep->used = false;
 		sys_slist_append(&remote_pool_free, &ep->node);
 		k_mutex_unlock(&remote_pool_mutex);
+		NRF_RPC_DBG("Remote EP[%d] released", ep->addr);
 		k_sem_give(&remote_pool_sem);
 	} else {
 		k_mutex_unlock(&remote_pool_mutex);
