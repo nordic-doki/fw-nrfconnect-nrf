@@ -78,7 +78,7 @@ static struct rpmsg_virtio_shm_pool shpool;
 
 /* Thread properties */
 static K_THREAD_STACK_DEFINE(rx_thread_stack,
-	CONFIG_RP_TRANS_PRMSG_RX_STACK_SIZE);
+	CONFIG_NRF_RPC_TR_PRMSG_RX_STACK_SIZE);
 
 
 static unsigned char virtio_get_status(struct virtio_device *vdev)
@@ -274,7 +274,7 @@ int rp_ll_init(void)
  
 	k_work_q_start(&my_work_q, rx_thread_stack,
 		K_THREAD_STACK_SIZEOF(rx_thread_stack),
-		CONFIG_RP_TRANS_PRMSG_RX_PRIORITY);
+		CONFIG_NRF_RPC_TR_PRMSG_RX_PRIORITY);
 	k_work_init(&work_item, work_callback);
 
 	LOG_DBG("initializing %s: SUCCESS", __func__);

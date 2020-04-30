@@ -72,7 +72,7 @@ K_MUTEX_DEFINE(remote_pool_mutex);
  */
 static struct nrf_rpc_local_ep local_endpoints[
 	CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE +
-	CONFIG_NRF_RPC_EXTRA_EP_COUNT];
+	CONFIG_NRF_RPC_LOCAL_EXTRA_EP_COUNT];
 
 /* Contains next available local endpoint instance in local_endpoints. */
 static atomic_t next_free_extra_ep =
@@ -157,7 +157,7 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 	}
 
 	if (dst_addr >= CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE +
-		        CONFIG_NRF_RPC_EXTRA_EP_COUNT) {
+		        CONFIG_NRF_RPC_LOCAL_EXTRA_EP_COUNT) {
 		/* Packet directed to null endpoint cannot be passed to specific
 		 * thread, so only filter callback is possible. */
 		receive_filter(NULL, src, &buf[NRF_RPC_TR_MAX_HEADER_SIZE],
@@ -257,7 +257,8 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback,
 		remote_pool[i].tr_ep.addr = i;
 		if (i < CONFIG_NRF_RPC_REMOTE_THREAD_POOL_SIZE) {
 			remote_pool[i].tr_ep.used = false;
-			sys_slist_append(&remote_pool_free, &remote_pool[i].tr_ep.node);
+			sys_slist_append(&remote_pool_free,
+					 &remote_pool[i].tr_ep.node);
 			k_sem_give(&remote_pool_sem);
 		}
 	}
@@ -288,8 +289,8 @@ error_exit:
 }
 
 
-int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf,
-		    size_t len)
+int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep,
+		    struct nrf_rpc_tr_remote_ep *dst_ep, u8_t *buf, size_t len)
 {
 	int err;
 	u8_t *full_packet = &buf[-NRF_RPC_TR_MAX_HEADER_SIZE];
@@ -297,7 +298,8 @@ int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 	NRF_RPC_ASSERT(buf != NULL);
 
 	full_packet[HEADER_DST_INDEX] = dst_ep ? dst_ep->addr : NULL_EP_ADDR;
-	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr : NULL_EP_ADDR;
+	full_packet[HEADER_SRC_INDEX] = local_ep ? local_ep->addr :
+					           NULL_EP_ADDR;
 
 	NRF_RPC_DBG("Sending from EP[%d] to EP[%d]",
 		    full_packet[HEADER_SRC_INDEX],
@@ -305,13 +307,15 @@ int nrf_rpc_tr_send(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remo
 
 	DUMP_LIMITED_DBG(full_packet, len + NRF_RPC_TR_MAX_HEADER_SIZE, "Send");
 
-	err = rp_ll_send(&ll_endpoint, full_packet, len + NRF_RPC_TR_MAX_HEADER_SIZE);
+	err = rp_ll_send(&ll_endpoint, full_packet,
+			 len + NRF_RPC_TR_MAX_HEADER_SIZE);
 
 	return translate_error(err);
 }
 
 
-int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep, struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf)
+int nrf_rpc_tr_read(struct nrf_rpc_tr_local_ep *local_ep,
+		    struct nrf_rpc_tr_remote_ep **src_ep, const uint8_t **buf)
 {
 	uint32_t len;
 	uint8_t src_addr;
@@ -370,9 +374,11 @@ void nrf_rpc_tr_release_buffer(struct nrf_rpc_tr_local_ep *local_ep)
 
 struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 {
-	struct nrf_rpc_tr_local_ep *ep = (struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
+	struct nrf_rpc_tr_local_ep *ep =
+		(struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
 
-	if (ep >= &local_endpoints[0].tr_ep && ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
+	if (ep >= &local_endpoints[0].tr_ep &&
+	    ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
 		return ep;
 	}
 
@@ -404,9 +410,11 @@ struct nrf_rpc_tr_local_ep *nrf_rpc_tr_current_get()
 
 void *nrf_rpc_tr_thread_custom_data_get(void)
 {
-	struct nrf_rpc_tr_local_ep *ep = (struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
+	struct nrf_rpc_tr_local_ep *ep =
+		(struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
 
-	if (ep >= &local_endpoints[0].tr_ep && ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
+	if (ep >= &local_endpoints[0].tr_ep &&
+	    ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
 		return ep->custom_data;
 	}
 
@@ -416,9 +424,11 @@ void *nrf_rpc_tr_thread_custom_data_get(void)
 
 void nrf_rpc_tr_thread_custom_data_set(void *value)
 {
-	struct nrf_rpc_tr_local_ep *ep = (struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
+	struct nrf_rpc_tr_local_ep *ep =
+		(struct nrf_rpc_tr_local_ep *)k_thread_custom_data_get();
 
-	if (ep >= &local_endpoints[0].tr_ep && ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
+	if (ep >= &local_endpoints[0].tr_ep &&
+	    ep < &local_endpoints[ARRAY_SIZE(local_endpoints)].tr_ep) {
 		ep->custom_data = value;
 		return;
 	}

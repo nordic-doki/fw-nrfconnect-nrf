@@ -17,12 +17,11 @@
 #include "rp_ll.h"
 
 /**
- * @file
- * @defgroup rp_transport Remote procedures transport
+ * @defgroup nrf_rpc_tr_rpmsg nRF PRC transport using RPMsg
  * @{
- * @brief Remote procedures transport implementation using rpmsg
+ * @brief nRF PRC transport implementation using RPMsg
  *
- * API is compatible with rp_trans API. For API documentation
+ * API is compatible with nrf_rpc_tr API. For API documentation
  * @see nrf_rpc_tr_tmpl.h
  */
 
@@ -113,5 +112,9 @@ void *nrf_rpc_tr_thread_custom_data_get(void);
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ *@}
+ */
 
 #endif /* NRF_RPC_TR_RPMSG_H_ */
