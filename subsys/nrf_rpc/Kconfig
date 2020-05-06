@@ -107,6 +107,14 @@ module = NRF_RPC_TR
 module-str = NRF_RPC_TR
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
+if NRF_RPC_CBOR
+
+module = NRF_RPC_CBOR
+module-str = NRF_RPC_CBOR
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # NRF_RPC_CBOR
+
 endif # NRF_RPC
 
 endmenu

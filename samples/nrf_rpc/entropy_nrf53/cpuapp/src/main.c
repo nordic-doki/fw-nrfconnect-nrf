@@ -14,9 +14,14 @@
 
 static u8_t buffer[BUFFER_LENGTH];
 
-static void async_callback(u8_t* buffer, size_t length)
+static void async_callback(int result, u8_t* buffer, size_t length)
 {
 	size_t i;
+
+	if (result) {
+		printk("Entropy remote get failed: %d\n", result);
+		return;
+	}
 
 	printk("async");
 
@@ -62,7 +67,7 @@ void main(void)
 #if 1
 		k_sleep(K_MSEC(5000));
 		
-		err = entropy_remote_get(buffer, sizeof(buffer));
+		err = entropy_remote_get_inline(buffer, sizeof(buffer));
 		if (err) {
 			printk("Entropy remote get failed: %d\n", err);
 			continue;
