@@ -1,7 +1,6 @@
 #include <bluetooth/services/nus.h>
 
-#include <cbor.h>
-#include <rp_ser.h>
+#include <nrf_rpc_cbor.h>
 
 #include <init.h>
 #include <logging/log.h>
@@ -11,13 +10,11 @@ LOG_MODULE_REGISTER(serialization);
 #include "serialization.h"
 #include "../../ser_common.h"
 
-#define SERIALIZATION_BUFFER_SIZE 64
+#define CBOR_BUF_SIZE 32
 
 #define BT_NUS_MAX_DATA_SIZE 20
-#define BT_EVT_PARAM_CNT 3
-#define NUS_RSP_PARAM_CNT 1
 
-RP_SER_DEFINE(nus_ser, struct k_sem, 0, 1000, 0);
+NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_ID_FIRST);
 
 __weak void bt_ready(int err)
 {
@@ -26,36 +23,29 @@ __weak void bt_ready(int err)
 
 static int rsp_error_code_sent(int err_code)
 {
-	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
-	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
+	int err;
+	CborEncoder *encoder;
+	struct nrf_rpc_cbor_rsp_ctx ctx;
 
-	rp_ser_buf_alloc(nus_ser, encoder, packet_size);
+	NRF_RPC_CBOR_RSP_ALLOC(ctx, encoder, CBOR_BUF_SIZE, return -ENOMEM);
 
-	err = rp_ser_procedure_initialize(&encoder, &container,
-					  NUS_RSP_PARAM_CNT,
-					  RP_SER_PACKET_TYPE_RSP,
-					  0);
+	if (cbor_encode_int(encoder, err_code) != CborNoError) {
+		return -EINVAL;
+	}
+
+	err = nrf_rpc_cbor_rsp_send(&ctx);
 	if (err) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_int(&container, err_code) != CborNoError) {
-		return -EINVAL;
-	}
-
-	err = rp_ser_procedure_end(&encoder);
-	if (err) {
-		return -EINVAL;
-	}
-
-	return rp_ser_rsp_send(&nus_ser, &encoder);
+	return 0;
 }
 
-static rp_err_t bt_cmd_bt_nus_init(CborValue *it)
+static int bt_cmd_bt_nus_init(CborValue *packet, void* handler_data)
 {
 	int err;
+
+	nrf_rpc_decoding_done();
 
 	err = bt_enable(bt_ready);
 	if (err) {
@@ -65,16 +55,19 @@ static rp_err_t bt_cmd_bt_nus_init(CborValue *it)
 	return rsp_error_code_sent(err);
 }
 
-static rp_err_t bt_cmd_gatt_nus_exec(CborValue *it)
+static int bt_cmd_gatt_nus_exec(CborValue *packet, void* handler_data)
 {
 	int err;
+	CborError cbor_err;
 	u8_t buf[BT_NUS_MAX_DATA_SIZE];
 	size_t len = sizeof(buf);
 
-	if (!cbor_value_is_byte_string(it) ||
-	    cbor_value_copy_byte_string(it, buf, &len, it) != CborNoError) {
-		return RP_ERROR_INTERNAL;
+	cbor_err = cbor_value_copy_byte_string(packet, buf, &len, packet);
+	if (cbor_err) {
+		return NRF_RPC_ERR_INTERNAL;
 	}
+
+	nrf_rpc_decoding_done();
 
 	err = bt_gatt_nus_send(NULL, buf, len);
 
@@ -84,45 +77,35 @@ static rp_err_t bt_cmd_gatt_nus_exec(CborValue *it)
 static int ble_event_send(const bt_addr_le_t *addr, u8_t evt,
 			  const u8_t *data, size_t length)
 {
-	rp_err_t err;
-	struct rp_ser_encoder encoder;
-	CborEncoder container;
-	size_t packet_size = SERIALIZATION_BUFFER_SIZE;
+	int err;
+	CborEncoder *encoder;
+	struct nrf_rpc_cbor_evt_ctx ctx;
 
-	rp_ser_buf_alloc(nus_ser, encoder, packet_size);
+	NRF_RPC_CBOR_EVT_ALLOC(ctx, &entropy_group, encoder, CBOR_BUF_SIZE, return -ENOMEM);
 
-	err = rp_ser_procedure_initialize(&encoder, &container,
-					  BT_EVT_PARAM_CNT,
-					  RP_SER_PACKET_TYPE_EVENT,
-					  evt);
-	if (err) {
-		return -EINVAL;
-	}
-
-	if (cbor_encode_simple_value(&container, addr->type) !=
+	if (cbor_encode_simple_value(encoder, addr->type) !=
 	    CborNoError) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_byte_string(&container,
+	if (cbor_encode_byte_string(encoder,
 				    addr->a.val,
 				    sizeof(addr->a.val)) !=
 	     CborNoError) {
 		return -EINVAL;
 	}
 
-	if (cbor_encode_byte_string(&container, data, length) !=
+	if (cbor_encode_byte_string(encoder, data, length) !=
 	    CborNoError) {
 		return -EINVAL;
 	}
 
-	err = rp_ser_procedure_end(&encoder);
+	err = nrf_rpc_cbor_evt_send(&ctx, evt);
 	if (err) {
 		return -EINVAL;
 	}
 
-	return rp_ser_evt_send(&nus_ser, &encoder);
-
+	return 0;
 }
 
 int bt_nus_connection_evt_send(const bt_addr_le_t *addr, u8_t error)
@@ -162,18 +145,23 @@ static int serialization_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	rp_err_t err;
+	int err;
 
-	err = rp_ser_init(&nus_ser);
+	printk("Init begin\n");
 
-	__ASSERT(err == RP_SUCCESS, "RP serialization initialization failed");
+	err = nrf_rpc_init();
+	if (err) {
+		return -EINVAL;
+	}
+
+	printk("Init done\n");
 
 	return 0;
 }
 
-RP_SER_CMD_DECODER(nus_ser, nus_init, SER_COMMAND_NUS_INIT,
-		   bt_cmd_bt_nus_init);
-RP_SER_CMD_DECODER(nus_ser, nus_send, SER_COMMAND_NUS_SEND,
-		   bt_cmd_gatt_nus_exec);
+NRF_RPC_CBOR_CMD_DECODER(entropy_group, nus_init, SER_COMMAND_NUS_INIT,
+			 bt_cmd_bt_nus_init, NULL);
+NRF_RPC_CBOR_CMD_DECODER(entropy_group, nus_send, SER_COMMAND_NUS_SEND,
+			 bt_cmd_gatt_nus_exec, NULL);
 
 SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
