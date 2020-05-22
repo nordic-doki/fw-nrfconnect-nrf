@@ -53,7 +53,7 @@ int entropy_remote_init(void)
 	int result;
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_cmd_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 
 	NRF_RPC_CBOR_CMD_ALLOC(ctx, &entropy_group, encoder, CBOR_BUF_SIZE, return -ENOMEM);
 
@@ -104,7 +104,7 @@ int entropy_remote_get(u8_t *buffer, size_t length)
 {
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_cmd_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 	struct entropy_get_result result = {
 		.buffer = buffer,
 		.length = length,
@@ -134,7 +134,7 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 	CborEncoder *encoder;
 	CborParser p;
 	CborValue parser;
-	struct nrf_rpc_cbor_cmd_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 	int result;
 	size_t buflen;
 
@@ -185,7 +185,7 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result, u8_t* bu
 {
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_evt_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 
 	if (length < 1 || callback == NULL) {
 		return -EINVAL;

@@ -25,7 +25,7 @@ static int rsp_error_code_send(int err_code)
 {
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_rsp_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 
 	NRF_RPC_CBOR_RSP_ALLOC(ctx, encoder, CBOR_BUF_SIZE, return -ENOMEM);
 
@@ -67,7 +67,7 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_rsp_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 
 	NRF_RPC_CBOR_RSP_ALLOC(ctx, encoder, CBOR_BUF_SIZE + length, return -ENOMEM);
 
@@ -86,7 +86,7 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 {
 	int err;
 	CborEncoder *encoder;
-	struct nrf_rpc_cbor_evt_ctx ctx;
+	struct nrf_rpc_cbor_alloc_ctx ctx;
 
 	NRF_RPC_CBOR_EVT_ALLOC(ctx, &entropy_group, encoder, CBOR_BUF_SIZE + length, return -ENOMEM);
 
