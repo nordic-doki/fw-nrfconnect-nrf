@@ -83,14 +83,14 @@ Kconfig*                                  @SebastianBoe
 /samples/mpsl/**/*.rst                    @b-gent
 /samples/nfc/                             @grochu
 /samples/nfc/**/README.rst                @b-gent
+/samples/nrf_rpc/                         @doki-nordic @KAGA164
+/samples/nrf_rpc/**/README.rst            @b-gent
 /samples/nrf9160/                         @rlubos @lemrey
 /samples/nrf9160/spm/                     @lemrey @hakonfam @ioannisg
 /samples/profiler/                        @pdunaj @pizi-nordic
 /samples/profiler/README.rst              @b-gent
 /samples/peripheral/radio_test/           @kapi-no
 /samples/peripheral/radio_test/README.rst @b-gent
-/samples/serialization/                   @KAGA164
-/samples/serialization/**/README.rst      @b-gent
 /samples/usb/usb_uart_bridge/             @jhn-nordic @jtguggedal
 /samples/usb/usb_uart_bridge/             @joakimtoe @jtguggedal
 /samples/CMakeLists.txt                   @SebastianBoe

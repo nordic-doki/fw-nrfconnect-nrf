@@ -36,12 +36,25 @@ int entropy_remote_init(void);
  *           Otherwise, a (negative) error code is returned.
  */
 int entropy_remote_get(u8_t *buffer, size_t length);
-int entropy_remote_get_inline(u8_t *buffer, size_t length);
 
 /**@brief Function for getting entropy value from the remote driver.
+ * 
+ * This function works identical as @ref entropy_remote_get, but also
+ * demonstates how to encode parameters and decode results in the same function.
  *
  * @param[out] buffer Received entropy data.
  * @param[in] length Requested entropy length.
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int entropy_remote_get_inline(u8_t *buffer, size_t length);
+
+/**@brief Function for getting entropy value from the remote driver in an
+ * asynchronous way.
+ *
+ * @param[in] length Requested entropy length.
+ * @param[in] callback Results will be passed to this callback.
  *
  * @retval 0 If the operation was successful.
  *           Otherwise, a (negative) error code is returned.
