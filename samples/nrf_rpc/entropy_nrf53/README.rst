@@ -1,32 +1,30 @@
 .. _nrf_rpc_entropy_nrf53:
 
-nRF5340: nRF_RPC Entropy
-##############################
+nRF5340: nRF RPC Entropy
+########################
 
-The nRF_RPC Entropy sample demonstrates how to use the entropy driver in a dual core device such as nRF5340 PDK.
+The nRF `RPC`_ Entropy sample demonstrates how to use the entropy driver in a dual core device such as nRF5340 PDK.
 
-The sample makes use of the entropy driver on the network core of an nRF5340 PDK that generates random data and the :ref:`nrf_rpc` that sends the generated data to the application core.
+The sample makes use of the entropy driver on the network core of an nRF5340 PDK that generates random data, and the :ref:`nrf_rpc` that sends the generated data to the application core.
 
 Overview
 ********
 
-
-When the sample starts, it displays the generated entropy data in the terminal at an interval of one second.
-
-The entropy data is generated on the network core using the Random Number Genrator (RNG) peripheral.
+The entropy data is generated on the network core using the Random Number Generator (RNG) peripheral.
 The :ref:`nrf_rpc` uses the `TinyCBOR`_ data format and transmits the data using the default `RPMsg Messaging Protocol`_ (part of `OpenAMP`_) in the transport layer.
 
 The application core uses serialized function calls such as :cpp:func:`entropy_remote_init` and :cpp:func:`entropy_remote_get` to control the entropy driver on the network core.
-The :cpp:func:`entropy_remote_init` is used for initializing the entropy and :cpp:func:`entropy_remote_get` is used for obtaining the entropy data.
+The :cpp:func:`entropy_remote_init` function is used for initializing the entropy, and the :cpp:func:`entropy_remote_get` function is used for obtaining the entropy data.
 
+When the sample starts, it displays the generated entropy data in the terminal at an interval of one second.
 
 Network core
 ============
 
-The network core runs the entropy drivers, which uses the RNG peripheral.
+The network core runs the entropy drivers, which use the RNG peripheral.
 When the network core receives the :cpp:func:`entropy_remote_get` remote function call, the following actions are performed:
 
-   * The network core searches for function decoders in the decoders table and calls it.
+   * The network core searches for function decoders in the decoders table and calls them.
    * The network core encodes the response data for the function call and sends the data back to the application core.
 
 Application core
@@ -73,7 +71,7 @@ After programming the sample to your board, test it by performing the following 
 Sample output
 =============
 
-The following output is logged on the terminal:
+The following output is displayed in the terminal:
 
 .. code-block:: console
 
@@ -91,4 +89,4 @@ From nrfxlib
   * :ref:`nrfxlib:nrf_rpc`
 
 From Zephyr
-  * :ref:`entropy_interface`
+  * :ref:`zephyr:entropy_api`

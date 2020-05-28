@@ -379,6 +379,8 @@
 
 .. _`RFC959 File Transfer Protocol (FTP)`: https://tools.ietf.org/html/rfc959
 
+.. _`RPC`: https://en.wikipedia.org/wiki/Remote_procedure_call
+
 .. ### Links to specific files on GitHub
 
 .. _`nrf9160dk_nrf9160_partition_conf.dts`: https://github.com/nrfconnect/sdk-zephyr/blob/master/boards/arm/nrf9160dk_nrf9160/nrf9160dk_nrf9160_partition_conf.dts
