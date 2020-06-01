@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Nordic Semiconductor ASA
  *
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
 #define NRF_RPC_LOG_MODULE NRF_RPC_TR
@@ -9,8 +9,6 @@
 
 #include <zephyr.h>
 #include <errno.h>
-
-#include <nrf_rpc_errors.h>
 
 #include "rp_ll.h"
 #include "nrf_rpc.h"
@@ -92,26 +90,26 @@ static int translate_error(int rpmsg_err)
 {
 	switch (rpmsg_err) {
 	case RPMSG_ERR_NO_MEM:
-		return NRF_RPC_ERR_NO_MEM;
+		return -ENOMEM;
 	case RPMSG_ERR_NO_BUFF:
-		return NRF_RPC_ERR_NO_MEM;
+		return -ENOMEM;
 	case RPMSG_ERR_PARAM:
-		return NRF_RPC_ERR_INVALID_PARAM;
+		return -EINVAL;
 	case RPMSG_ERR_DEV_STATE:
-		return NRF_RPC_ERR_INVALID_STATE;
+		return -EIO;
 	case RPMSG_ERR_BUFF_SIZE:
-		return NRF_RPC_ERR_NO_MEM;
+		return -ENOMEM;
 	case RPMSG_ERR_INIT:
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	case RPMSG_ERR_ADDR:
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	default:
 		if (rpmsg_err < 0) {
-			return NRF_RPC_ERR_INTERNAL;
+			return -EIO;
 		}
 		break;
 	}
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 

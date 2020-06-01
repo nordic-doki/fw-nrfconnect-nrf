@@ -26,7 +26,7 @@ struct entropy_get_result {
 static void (*async_callback)(int result, u8_t *buffer, size_t length);
 
 
-NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_ID_FIRST);
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy");
 
 
 int rsp_error_code_handle(CborValue *parser, void *handler_data)
@@ -35,16 +35,16 @@ int rsp_error_code_handle(CborValue *parser, void *handler_data)
 
 	if (!cbor_value_is_integer(parser)) {
 		*(int *)handler_data = -EINVAL;
-		return NRF_RPC_SUCCESS;
+		return 0;
 	}
 
 	cbor_err = cbor_value_get_int(parser, (int *)handler_data);
 	if (cbor_err != CborNoError) {
 		*(int *)handler_data = -EINVAL;
-		return NRF_RPC_SUCCESS;
+		return 0;
 	}
 
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 
@@ -60,7 +60,7 @@ int entropy_remote_init(void)
 
 	err = nrf_rpc_cbor_cmd_send(&ctx, RPC_COMMAND_ENTROPY_INIT,
 				    rsp_error_code_handle, &result);
-	if (err != NRF_RPC_SUCCESS) {
+	if (err != 0) {
 		return -EINVAL;
 	}
 
@@ -96,11 +96,11 @@ static int entropy_get_rsp(CborValue *parser, void *handler_data)
 		goto cbor_error_exit;
 	}
 
-	return NRF_RPC_SUCCESS;
+	return 0;
 
 cbor_error_exit:
 	result->result = -EINVAL;
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 
@@ -226,7 +226,7 @@ static int entropy_get_result_handler(CborValue *value, void *handler_data)
 
 	if (async_callback == NULL) {
 		nrf_rpc_decoding_done();
-		return NRF_RPC_ERR_INVALID_STATE;
+		return -EIO;
 	}
 
 	err = cbor_value_get_int(value, &err_code);
@@ -249,12 +249,12 @@ static int entropy_get_result_handler(CborValue *value, void *handler_data)
 
 	async_callback(err_code, buf, length);
 
-	return NRF_RPC_SUCCESS;
+	return 0;
 
 cbor_error_exit:
 	nrf_rpc_decoding_done();
 	async_callback(-EINVAL, buf, 0);
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 
