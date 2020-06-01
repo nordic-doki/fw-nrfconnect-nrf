@@ -17,7 +17,7 @@
 
 #define CBOR_BUF_SIZE 16
 
-NRF_RPC_GROUP_DEFINE(entropy_group, NRF_RPC_USER_GROUP_ID_FIRST);
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy");
 
 static struct device *entropy;
 
@@ -49,15 +49,15 @@ static int entropy_init_handler(CborValue *packet, void *handler_data)
 	if (!entropy) {
 		rsp_error_code_send(-EINVAL);
 
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	}
 
 	err = rsp_error_code_send(0);
 	if (err) {
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	}
 
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_init, RPC_COMMAND_ENTROPY_INIT,
@@ -116,12 +116,12 @@ static int entropy_get_handler(CborValue *packet, void *handler_data)
 	nrf_rpc_decoding_done();
 
 	if (cbor_err != CborNoError || length < 0 || length > 0xFFFF) {
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	}
 
 	buf = k_malloc(length);
 	if (!buf) {
-		return NRF_RPC_ERR_NO_MEM;
+		return -ENOMEM;
 	}
 
 	err = entropy_get_entropy(entropy, buf, length);
@@ -135,10 +135,10 @@ static int entropy_get_handler(CborValue *packet, void *handler_data)
 	k_free(buf);
 
 	if (err) {
-		return NRF_RPC_ERR_INTERNAL;
+		return -EIO;
 	}
 
-	return NRF_RPC_SUCCESS;
+	return 0;
 }
 
 NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get, RPC_COMMAND_ENTROPY_GET,
