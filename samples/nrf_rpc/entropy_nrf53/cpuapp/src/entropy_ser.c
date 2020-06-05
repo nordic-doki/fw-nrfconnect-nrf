@@ -1,3 +1,4 @@
+#if 0
 /*
  * Copyright (c) 2020 Nordic Semiconductor ASA
  *
@@ -282,3 +283,87 @@ static int serialization_init(struct device *dev)
 
 
 SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
+
+#else 
+
+#include <errno.h>
+#include <init.h>
+
+#include <tinycbor/cbor.h>
+
+#include <nrf_rpc.h>
+
+#include "../../ser_common.h"
+
+
+struct entropy_get_result {
+	u8_t *buffer;
+	size_t length;
+	int result;
+};
+
+
+static void (*async_callback)(int result, u8_t *buffer, size_t length);
+
+
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy", NULL, 0);
+
+
+int rsp_error_code_handle(CborValue *parser, void *handler_data)
+{
+	return 0;
+}
+
+
+int entropy_remote_init(void)
+{
+	return 0;
+}
+
+
+static int entropy_get_rsp(CborValue *parser, void *handler_data)
+{
+	return 0;
+}
+
+
+int entropy_remote_get(u8_t *buffer, size_t length)
+{
+	return 0;
+}
+
+
+int entropy_remote_get_inline(u8_t *buffer, size_t length)
+{
+	return 0;
+}
+
+
+int entropy_remote_get_async(u16_t length, void (*callback)(int result,
+							    u8_t *buffer,
+							    size_t length))
+{
+	return 0;
+}
+
+
+static int entropy_get_result_handler(CborValue *value, void *handler_data)
+{
+	return 0;
+}
+
+
+/*NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_result,
+			 RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
+			 entropy_get_result_handler, NULL);*/
+
+static int serialization_init(struct device *dev)
+{
+
+	return 0;
+}
+
+
+SYS_INIT(serialization_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);
+
+#endif
