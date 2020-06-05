@@ -10,7 +10,7 @@
 
 #include <nrf_rpc_cbor.h>
 
-#include "../../ser_common.h"
+#include "../../common_ids.h"
 
 
 #define CBOR_BUF_SIZE 16
@@ -26,25 +26,21 @@ struct entropy_get_result {
 static void (*async_callback)(int result, u8_t *buffer, size_t length);
 
 
-NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy");
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy", NULL, NULL, NULL);
 
 
-int rsp_error_code_handle(CborValue *parser, void *handler_data)
+void rsp_error_code_handle(CborValue *value, void *handler_data)
 {
 	CborError cbor_err;
 
-	if (!cbor_value_is_integer(parser)) {
+	if (!cbor_value_is_integer(value)) {
 		*(int *)handler_data = -EINVAL;
-		return 0;
 	}
 
-	cbor_err = cbor_value_get_int(parser, (int *)handler_data);
+	cbor_err = cbor_value_get_int(value, (int *)handler_data);
 	if (cbor_err != CborNoError) {
 		*(int *)handler_data = -EINVAL;
-		return 0;
 	}
-
-	return 0;
 }
 
 
@@ -52,63 +48,59 @@ int entropy_remote_init(void)
 {
 	int result;
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	struct nrf_rpc_cbor_ctx ctx;
 
-	NRF_RPC_CBOR_CMD_ALLOC(ctx, &entropy_group, encoder, CBOR_BUF_SIZE,
-			       return -ENOMEM);
+	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
 
-	err = nrf_rpc_cbor_cmd_send(&ctx, RPC_COMMAND_ENTROPY_INIT,
-				    rsp_error_code_handle, &result);
-	if (err != 0) {
-		return -EINVAL;
+	err = nrf_rpc_cbor_cmd(&entropy_group, RPC_COMMAND_ENTROPY_INIT, &ctx,
+			       rsp_error_code_handle, &result);
+	if (err < 0) {
+		return err;
 	}
 
 	return result;
 }
 
 
-static int entropy_get_rsp(CborValue *parser, void *handler_data)
+static void entropy_get_rsp(CborValue *value, void *handler_data)
 {
 	size_t buflen;
 	CborError cbor_err;
 	struct entropy_get_result *result =
 		(struct entropy_get_result *)handler_data;
 
-	if (!cbor_value_is_integer(parser)) {
+	if (!cbor_value_is_integer(value)) {
 		goto cbor_error_exit;
 	}
 
-	cbor_err = cbor_value_get_int(parser, &result->result);
+	cbor_err = cbor_value_get_int(value, &result->result);
 	if (cbor_err != CborNoError) {
 		goto cbor_error_exit;
 	}
 
-	cbor_err = cbor_value_advance(parser);
+	cbor_err = cbor_value_advance(value);
 	if (cbor_err != CborNoError) {
 		goto cbor_error_exit;
 	}
 
 	buflen = result->length;
-	cbor_err = cbor_value_copy_byte_string(parser, result->buffer, &buflen,
+	cbor_err = cbor_value_copy_byte_string(value, result->buffer, &buflen,
 					       NULL);
 	if (cbor_err != CborNoError || buflen != result->length) {
 		goto cbor_error_exit;
 	}
 
-	return 0;
+	return;
 
 cbor_error_exit:
 	result->result = -EINVAL;
-	return 0;
 }
 
 
 int entropy_remote_get(u8_t *buffer, size_t length)
 {
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	struct nrf_rpc_cbor_ctx ctx;
 	struct entropy_get_result result = {
 		.buffer = buffer,
 		.length = length,
@@ -118,13 +110,12 @@ int entropy_remote_get(u8_t *buffer, size_t length)
 		return -EINVAL;
 	}
 
-	NRF_RPC_CBOR_CMD_ALLOC(ctx, &entropy_group, encoder, CBOR_BUF_SIZE,
-			       return -ENOMEM);
+	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
 
-	cbor_encode_int(encoder, length);
+	cbor_encode_int(&ctx.encoder, length);
 
-	err = nrf_rpc_cbor_cmd_send(&ctx, RPC_COMMAND_ENTROPY_GET,
-				    entropy_get_rsp, &result);
+	err = nrf_rpc_cbor_cmd(&entropy_group, RPC_COMMAND_ENTROPY_GET, &ctx,
+			       entropy_get_rsp, &result);
 	if (err) {
 		return -EINVAL;
 	}
@@ -137,10 +128,7 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 {
 	int err;
 	CborError cbor_err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_cmd_rsp_ctx rsp_ctx;
-	CborValue parser;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	struct nrf_rpc_cbor_rsp_ctx ctx;
 	int result;
 	size_t buflen;
 
@@ -148,43 +136,42 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 		return -EINVAL;
 	}
 
-	NRF_RPC_CBOR_CMD_ALLOC(ctx, &entropy_group, encoder, 16,
-			       return -ENOMEM);
+	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
 
-	cbor_encode_int(encoder, length);
+	cbor_encode_int(&ctx.encoder, length);
 
-	err = nrf_rpc_cbor_cmd_rsp_send(&ctx, RPC_COMMAND_ENTROPY_GET, &rsp_ctx,
-					&parser);
+	err = nrf_rpc_cbor_cmd_rsp(&entropy_group, RPC_COMMAND_ENTROPY_GET,
+				   &ctx);
 	if (err) {
 		return -EINVAL;
 	}
 
-	if (!cbor_value_is_integer(&parser)) {
+	if (!cbor_value_is_integer(&ctx.value)) {
 		goto cbor_error_exit;
 	}
 
-	cbor_err = cbor_value_get_int(&parser, &result);
+	cbor_err = cbor_value_get_int(&ctx.value, &result);
 	if (cbor_err != CborNoError) {
 		goto cbor_error_exit;
 	}
 
-	cbor_err = cbor_value_advance(&parser);
+	cbor_err = cbor_value_advance(&ctx.value);
 	if (cbor_err != CborNoError) {
 		goto cbor_error_exit;
 	}
 
 	buflen = length;
-	cbor_err = cbor_value_copy_byte_string(&parser, buffer, &buflen, NULL);
+	cbor_err = cbor_value_copy_byte_string(&ctx.value, buffer, &buflen,
+					       NULL);
 	if (cbor_err != CborNoError || buflen != length) {
 		goto cbor_error_exit;
 	}
 
-	nrf_rpc_decoding_done();
-
+	nrf_rpc_cbor_decoding_done(&ctx.value);
 	return result;
 
 cbor_error_exit:
-	nrf_rpc_decoding_done();
+	nrf_rpc_cbor_decoding_done(&ctx.value);
 	return -EINVAL;
 }
 
@@ -194,8 +181,7 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result,
 							    size_t length))
 {
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	struct nrf_rpc_cbor_ctx ctx;
 
 	if (length < 1 || callback == NULL) {
 		return -EINVAL;
@@ -203,12 +189,12 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result,
 
 	async_callback = callback;
 
-	NRF_RPC_CBOR_EVT_ALLOC(ctx, &entropy_group, encoder, 16,
-			       return -ENOMEM);
+	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
 
-	cbor_encode_int(encoder, length);
+	cbor_encode_int(&ctx.encoder, length);
 
-	err = nrf_rpc_cbor_evt_send(&ctx, RPC_EVENT_ENTROPY_GET_ASYNC);
+	err = nrf_rpc_cbor_evt(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC,
+			       &ctx);
 	if (err) {
 		return -EINVAL;
 	}
@@ -217,7 +203,7 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result,
 }
 
 
-static int entropy_get_result_handler(CborValue *value, void *handler_data)
+static void entropy_get_result_handler(CborValue *value, void *handler_data)
 {
 	int err_code;
 	CborError err;
@@ -225,8 +211,7 @@ static int entropy_get_result_handler(CborValue *value, void *handler_data)
 	u8_t buf[32];
 
 	if (async_callback == NULL) {
-		nrf_rpc_decoding_done();
-		return -EIO;
+		nrf_rpc_cbor_decoding_done(value);
 	}
 
 	err = cbor_value_get_int(value, &err_code);
@@ -245,22 +230,28 @@ static int entropy_get_result_handler(CborValue *value, void *handler_data)
 		goto cbor_error_exit;
 	}
 
-	nrf_rpc_decoding_done();
-
+	nrf_rpc_cbor_decoding_done(value);
 	async_callback(err_code, buf, length);
-
-	return 0;
+	return;
 
 cbor_error_exit:
-	nrf_rpc_decoding_done();
+	nrf_rpc_cbor_decoding_done(value);
 	async_callback(-EINVAL, buf, 0);
-	return 0;
 }
 
 
 NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_result,
 			 RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
 			 entropy_get_result_handler, NULL);
+
+
+static void err_handler(const struct nrf_rpc_err_report *report)
+{
+	printk("nRF RPC error %d ocurred. See nRF RPC logs for more details.",
+	       report->code);
+	k_oops();
+}
+
 
 static int serialization_init(struct device *dev)
 {
@@ -270,7 +261,7 @@ static int serialization_init(struct device *dev)
 
 	printk("Init begin\n");
 
-	err = nrf_rpc_init();
+	err = nrf_rpc_init(err_handler);
 	if (err) {
 		return -EINVAL;
 	}
