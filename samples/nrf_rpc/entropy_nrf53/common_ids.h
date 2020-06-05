@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#ifndef SER_COMMON_H_
-#define SER_COMMON_H_
+#ifndef COMMON_IDS_H_
+#define COMMON_IDS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,4 +25,4 @@ enum rpc_event {
 }
 #endif
 
-#endif /* SER_COMMON_H_ */
+#endif /* COMMON_IDS_H_ */
