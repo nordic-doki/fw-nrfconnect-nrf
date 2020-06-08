@@ -7,31 +7,29 @@
 #include <init.h>
 #include <drivers/entropy.h>
 
-#include <tinycbor/cbor.h>
-#include <nrf_rpc_cbor.h>
+#include <nrf_rpc.h>
 
 #include <device.h>
 
 #include "../../ser_common.h"
 
-
-#define CBOR_BUF_SIZE 16
-
-NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy");
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL);
 
 static struct device *entropy;
 
 static int rsp_error_code_send(int err_code)
 {
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	uint8_t *packet;
 
-	NRF_RPC_CBOR_RSP_ALLOC(ctx, encoder, CBOR_BUF_SIZE, return -ENOMEM);
+	NRF_RPC_ALLOC(packet, sizeof(int));
+	if (NRF_RPC_ALLOC_FAILED(packet)) {
+		return -ENOMEM;
+	}
 
-	cbor_encode_int(encoder, err_code);
+	*(int *)&packet[0] = err_code;
 
-	err = nrf_rpc_cbor_rsp_send(&ctx);
+	err = nrf_rpc_rsp_send(packet, sizeof(int));
 	if (err) {
 		return -EINVAL;
 	}
@@ -39,7 +37,7 @@ static int rsp_error_code_send(int err_code)
 	return 0;
 }
 
-static int entropy_init_handler(CborValue *packet, void *handler_data)
+static int entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
 	int err;
 
@@ -48,8 +46,7 @@ static int entropy_init_handler(CborValue *packet, void *handler_data)
 	entropy = device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
 	if (!entropy) {
 		rsp_error_code_send(-EINVAL);
-
-		return -EIO;
+		return -EINVAL;
 	}
 
 	err = rsp_error_code_send(0);
@@ -60,22 +57,23 @@ static int entropy_init_handler(CborValue *packet, void *handler_data)
 	return 0;
 }
 
-NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_init, RPC_COMMAND_ENTROPY_INIT,
-			 entropy_init_handler, NULL);
+NRF_RPC_CMD_DECODER(entropy_group, entropy_init, RPC_COMMAND_ENTROPY_INIT,
+		   entropy_init_handler, NULL);
 
 static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 {
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	uint8_t *packet;
 
-	NRF_RPC_CBOR_RSP_ALLOC(ctx, encoder, CBOR_BUF_SIZE + length,
-			       return -ENOMEM);
+	NRF_RPC_ALLOC(packet, sizeof(int) + length);
+	if (NRF_RPC_ALLOC_FAILED(packet)) {
+		return -ENOMEM;
+	}
 
-	cbor_encode_int(encoder, err_code);
-	cbor_encode_byte_string(encoder, data, length);
+	*(int *)&packet[0] = err_code;
+	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_cbor_rsp_send(&ctx);
+	err = nrf_rpc_rsp_send(packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -86,16 +84,17 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 {
 	int err;
-	CborEncoder *encoder;
-	struct nrf_rpc_cbor_alloc_ctx ctx;
+	uint8_t *packet;
 
-	NRF_RPC_CBOR_EVT_ALLOC(ctx, &entropy_group, encoder,
-			       CBOR_BUF_SIZE + length, return -ENOMEM);
+	NRF_RPC_ALLOC(packet, sizeof(int) + length);
+	if (NRF_RPC_ALLOC_FAILED(packet)) {
+		return -ENOMEM;
+	}
 
-	cbor_encode_int(encoder, err_code);
-	cbor_encode_byte_string(encoder, data, length);
+	*(int *)&packet[0] = err_code;
+	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_cbor_evt_send(&ctx, RPC_EVENT_ENTROPY_GET_ASYNC_RESULT);
+	err = nrf_rpc_evt_send(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -103,21 +102,21 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-static int entropy_get_handler(CborValue *packet, void *handler_data)
+static int entropy_get_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
-	CborError cbor_err;
 	int err;
-	int length;
+	uint16_t length;
 	u8_t *buf;
-	uintptr_t async = (uintptr_t)handler_data;
+	struct nrf_rpc_decoder *decoder = (struct nrf_rpc_decoder *)handler_data;
+	
+	if (packet_len < sizeof(uint16_t)) {
+		nrf_rpc_decoding_done();
+		return -EINVAL;
+	}
 
-	cbor_err = cbor_value_get_int(packet, &length);
+	length = *(uint16_t *)&packet[0];
 
 	nrf_rpc_decoding_done();
-
-	if (cbor_err != CborNoError || length < 0 || length > 0xFFFF) {
-		return -EIO;
-	}
 
 	buf = k_malloc(length);
 	if (!buf) {
@@ -126,26 +125,26 @@ static int entropy_get_handler(CborValue *packet, void *handler_data)
 
 	err = entropy_get_entropy(entropy, buf, length);
 
-	if (async) {
+	if (decoder->id == RPC_EVENT_ENTROPY_GET_ASYNC) {
+		printk("SER_EVENT_ENTROPY_GET_ASYNC\n");
 		err = entropy_get_result_evt(err, buf, length);
 	} else {
 		err = entropy_get_rsp(err, buf, length);
 	}
 
-	k_free(buf);
-
 	if (err) {
 		return -EIO;
 	}
 
+	k_free(buf);
+
 	return 0;
 }
 
-NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get, RPC_COMMAND_ENTROPY_GET,
-			 entropy_get_handler, (void *)0);
-NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_async,
-			 RPC_EVENT_ENTROPY_GET_ASYNC, entropy_get_handler,
-			 (void *)1);
+NRF_RPC_CMD_DECODER(entropy_group, entropy_get, RPC_COMMAND_ENTROPY_GET,
+		   entropy_get_handler, NULL);
+NRF_RPC_EVT_DECODER(entropy_group, entropy_get_async, RPC_EVENT_ENTROPY_GET_ASYNC,
+		   entropy_get_handler, NULL);
 
 static int serialization_init(struct device *dev)
 {

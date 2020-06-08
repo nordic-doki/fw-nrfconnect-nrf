@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#define NRF_RPC_LOG_MODULE NRF_RPC_RPMSG
+#define NRF_RPC_LOG_MODULE NRF_RPC_TR
 #include <nrf_rpc_log.h>
 
 #include <zephyr.h>
