@@ -82,4 +82,9 @@ static inline void nrf_rpc_os_remote_release()
 	k_sem_give(&_nrf_rpc_os_remote_counter);
 }
 
+static inline void nrf_rpc_os_fault()
+{
+	k_oops();
+}
+
 #endif /* NRF_RPC_OS_H_ */

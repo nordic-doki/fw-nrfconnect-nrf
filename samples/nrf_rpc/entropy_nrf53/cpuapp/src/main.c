@@ -45,7 +45,7 @@ void main(void)
 	printk("Remote init send\n");
 
 	while (true) {
-		k_sleep(K_MSEC(1000));
+/*		k_sleep(K_MSEC(1000));
 
 		err = entropy_remote_get(buffer, sizeof(buffer));
 		if (err) {
@@ -72,7 +72,7 @@ void main(void)
 		}
 
 		printk("\n");
-
+*/
 		k_sleep(K_MSEC(1000));
 
 		err = entropy_remote_get_async(sizeof(buffer), async_callback);

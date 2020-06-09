@@ -9,8 +9,9 @@
 #include <nrf_rpc.h>
 
 #include "../../ser_common.h"
+#include "entropy_ser.h"
 
-static void (*async_callback)(u8_t* buffer, size_t length);
+static void (*async_callback)(int result, u8_t *buffer, size_t length);
 
 NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL);
 
@@ -65,7 +66,7 @@ static int entropy_get_rsp(const uint8_t *packet, size_t len,
 	return 0;
 }
 
-int entropy_remote_get(u8_t *buffer, u16_t length)
+int entropy_remote_get(u8_t *buffer, size_t length)
 {
 	int err;
 	uint8_t* packet;
@@ -93,7 +94,7 @@ int entropy_remote_get(u8_t *buffer, u16_t length)
 	return result.result;
 }
 
-int entropy_remote_get_inline(u8_t *buffer, u16_t length)
+int entropy_remote_get_inline(u8_t *buffer, size_t length)
 {
 	int err;
 	uint8_t* packet;
@@ -130,7 +131,10 @@ int entropy_remote_get_inline(u8_t *buffer, u16_t length)
 	return result;
 }
 
-int entropy_remote_get_async(u16_t length, void (*callback)(u8_t* buffer, size_t length))
+
+int entropy_remote_get_async(size_t length, void (*callback)(int result,
+							     u8_t *buffer,
+							     size_t length))
 {
 	int err;
 	uint8_t* packet;
@@ -177,7 +181,7 @@ static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, 
 	nrf_rpc_decoding_done();
 
 	if (async_callback != NULL) {
-		async_callback(buf, length);
+		async_callback(0, buf, length);
 	}
 
 	return 0;
