@@ -9,6 +9,10 @@
 
 #include <zephyr.h>
 #include <errno.h>
+#include <metal/sys.h>
+#include <metal/device.h>
+#include <metal/alloc.h>
+#include <openamp/open_amp.h>
 
 #include "rp_ll.h"
 #include "nrf_rpc.h"
@@ -26,7 +30,7 @@
 	}								       \
 } while (0)
 
-/* DKTODO: */
+/* Semaphore used to do initial handshake */
 K_SEM_DEFINE(handshake_sem, 0, 1);
 
 /* Upper level callbacks */
@@ -79,7 +83,7 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 
 	DUMP_LIMITED_DBG(buf, length, "Received data");
 
-	receive_callback(buf, length); // DKTODO: Check signes
+	receive_callback(buf, length);
 }
 
 
@@ -103,12 +107,12 @@ int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback)
 
 	k_sem_take(&handshake_sem, K_FOREVER);
 
+	NRF_RPC_DBG("nRF RPC Initialized");
+
+	return 0;
+
 error_exit:
-	if (err >= 0) {
-		NRF_RPC_DBG("nRF RPC Initialized");
-	} else {
-		NRF_RPC_DBG("nRF RPC Initialization error %d", err);
-	}
+	NRF_RPC_DBG("nRF RPC Initialization error %d", err);
 
 	return translate_error(err);
 }

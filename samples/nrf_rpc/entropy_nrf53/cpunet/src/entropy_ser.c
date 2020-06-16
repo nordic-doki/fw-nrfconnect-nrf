@@ -23,9 +23,6 @@ static int rsp_error_code_send(int err_code)
 	uint8_t *packet;
 
 	NRF_RPC_ALLOC(packet, sizeof(int));
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(int *)&packet[0] = err_code;
 
@@ -37,24 +34,17 @@ static int rsp_error_code_send(int err_code)
 	return 0;
 }
 
-static int entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+static void entropy_init_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
-	int err;
-
-	nrf_rpc_decoding_done();
+	nrf_rpc_decoding_done(packet);
 
 	entropy = device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
 	if (!entropy) {
 		rsp_error_code_send(-EINVAL);
-		return -EINVAL;
+		return;
 	}
 
-	err = rsp_error_code_send(0);
-	if (err) {
-		return -EIO;
-	}
-
-	return 0;
+	rsp_error_code_send(0);
 }
 
 NRF_RPC_CMD_DECODER(entropy_group, entropy_init, RPC_COMMAND_ENTROPY_INIT,
@@ -66,9 +56,6 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 	uint8_t *packet;
 
 	NRF_RPC_ALLOC(packet, sizeof(int) + length);
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
@@ -87,9 +74,6 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	uint8_t *packet;
 
 	NRF_RPC_ALLOC(packet, sizeof(int) + length);
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
@@ -102,7 +86,7 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	return 0;
 }
 
-static int entropy_get_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+static void entropy_get_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
 	int err;
 	uint16_t length;
@@ -110,35 +94,27 @@ static int entropy_get_handler(const uint8_t *packet, size_t packet_len, void* h
 	bool is_event = ((int)handler_data != 0);
 	
 	if (packet_len < sizeof(uint16_t)) {
-		nrf_rpc_decoding_done();
-		return -EINVAL;
+		nrf_rpc_decoding_done(packet);
 	}
 
 	length = *(uint16_t *)&packet[0];
 
-	nrf_rpc_decoding_done();
+	nrf_rpc_decoding_done(packet);
 
 	buf = k_malloc(length);
 	if (!buf) {
-		return -ENOMEM;
+		return;
 	}
 
 	err = entropy_get_entropy(entropy, buf, length);
 
 	if (is_event) {
-		printk("SER_EVENT_ENTROPY_GET_ASYNC\n");
-		err = entropy_get_result_evt(err, buf, length);
+		entropy_get_result_evt(err, buf, length);
 	} else {
-		err = entropy_get_rsp(err, buf, length);
-	}
-
-	if (err) {
-		return -EIO;
+		entropy_get_rsp(err, buf, length);
 	}
 
 	k_free(buf);
-
-	return 0;
 }
 
 NRF_RPC_CMD_DECODER(entropy_group, entropy_get, RPC_COMMAND_ENTROPY_GET,

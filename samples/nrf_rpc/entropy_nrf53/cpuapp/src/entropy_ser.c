@@ -33,9 +33,6 @@ int entropy_remote_init(void)
 	uint8_t* packet;
 
 	NRF_RPC_ALLOC(packet, 0);
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	err = nrf_rpc_cmd_send(&entropy_group, RPC_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
 	if (err < 0) {
@@ -80,9 +77,6 @@ int entropy_remote_get(u8_t *buffer, size_t length)
 	}
 
 	NRF_RPC_ALLOC(packet, sizeof(uint16_t));
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(uint16_t *)&packet[0] = length;
 
@@ -107,9 +101,6 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 	}
 
 	NRF_RPC_ALLOC(packet, sizeof(uint16_t));
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(uint16_t *)&packet[0] = length;
 
@@ -119,14 +110,14 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 	}
 
 	if (rsp_len != sizeof(int) + length) {
-		nrf_rpc_decoding_done();
+		nrf_rpc_decoding_done(buffer);
 		return -EIO;
 	}
 	result = *(int *)&rsp[0];
 
 	memcpy(buffer, &rsp[sizeof(int)], length);
 
-	nrf_rpc_decoding_done();
+	nrf_rpc_decoding_done(buffer);
 
 	return result;
 }
@@ -144,9 +135,6 @@ int entropy_remote_get_async(size_t length, void (*callback)(int result,
 	}
 
 	NRF_RPC_ALLOC(packet, sizeof(uint16_t));
-	if (NRF_RPC_ALLOC_FAILED(packet)) {
-		return -ENOMEM;
-	}
 
 	*(uint16_t *)&packet[0] = length;
 
@@ -167,7 +155,7 @@ static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, 
 	u8_t buf[32];
 
 	if (packet_len < sizeof(int)) {
-		nrf_rpc_decoding_done();
+		nrf_rpc_decoding_done(packet);
 		return -EIO;
 	}
 	err = *(int *)&packet[0];
@@ -178,7 +166,7 @@ static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, 
 
 	memcpy(buf, &packet[sizeof(int)], length);
 
-	nrf_rpc_decoding_done();
+	nrf_rpc_decoding_done(packet);
 
 	if (async_callback != NULL) {
 		async_callback(0, buf, length);
