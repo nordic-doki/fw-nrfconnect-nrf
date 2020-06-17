@@ -13,17 +13,15 @@
 
 static void (*async_callback)(int result, u8_t *buffer, size_t length);
 
-NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL);
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL, NULL);
 
-int rsp_error_code_handle(const uint8_t *packet, size_t len,
+void rsp_error_code_handle(const uint8_t *packet, size_t len,
 				  void* hander_data)
 {
 	if (len < sizeof(int)) {
-		return -EINVAL;
+		return;
 	}
 	*(int *)hander_data = *(int *)&packet[0];
-
-	return 0;
 }
 
 int entropy_remote_init(void)
@@ -48,19 +46,17 @@ struct entropy_get_result {
 	int result;
 };
 
-static int entropy_get_rsp(const uint8_t *packet, size_t len,
+static void entropy_get_rsp(const uint8_t *packet, size_t len,
 				  void* hander_data)
 {
 	struct entropy_get_result *result = (struct entropy_get_result *)hander_data;
 
 	if (len != sizeof(int) + result->length) {
-		return -EIO;
+		return;
 	}
 	result->result = *(int *)&packet[0];
 
 	memcpy(result->buffer, &packet[sizeof(int)], result->length);
-
-	return 0;
 }
 
 int entropy_remote_get(u8_t *buffer, size_t length)
@@ -148,7 +144,7 @@ int entropy_remote_get_async(size_t length, void (*callback)(int result,
 	return 0;
 }
 
-static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
+static void entropy_get_result_handler(const uint8_t *packet, size_t packet_len, void* handler_data)
 {
 	int err;
 	size_t length;
@@ -156,12 +152,12 @@ static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, 
 
 	if (packet_len < sizeof(int)) {
 		nrf_rpc_decoding_done(packet);
-		return -EIO;
+		return;
 	}
 	err = *(int *)&packet[0];
 	length = packet_len - sizeof(int);
 	if (length > sizeof(buf)) {
-		return -ENOMEM;
+		return;
 	}
 
 	memcpy(buf, &packet[sizeof(int)], length);
@@ -171,8 +167,6 @@ static int entropy_get_result_handler(const uint8_t *packet, size_t packet_len, 
 	if (async_callback != NULL) {
 		async_callback(0, buf, length);
 	}
-
-	return 0;
 }
 
 NRF_RPC_EVT_DECODER(entropy_group, entropy_get_result, RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
@@ -186,7 +180,7 @@ static int serialization_init(struct device *dev)
 
 	printk("Init begin\n");
 
-	err = nrf_rpc_init();
+	err = nrf_rpc_init(NULL);
 	if (err) {
 		return -EINVAL;
 	}
