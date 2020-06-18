@@ -26,7 +26,7 @@ static int rsp_error_code_send(int err_code)
 
 	*(int *)&packet[0] = err_code;
 
-	err = nrf_rpc_rsp_send(packet, sizeof(int));
+	err = nrf_rpc_rsp(packet, sizeof(int));
 	if (err) {
 		return -EINVAL;
 	}
@@ -60,7 +60,7 @@ static int entropy_get_rsp(int err_code, u8_t *data, size_t length)
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_rsp_send(packet, sizeof(int) + length);
+	err = nrf_rpc_rsp(packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}
@@ -78,7 +78,7 @@ static int entropy_get_result_evt(int err_code, u8_t *data, size_t length)
 	*(int *)&packet[0] = err_code;
 	memcpy(&packet[sizeof(int)], data, length);
 
-	err = nrf_rpc_evt_send(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
+	err = nrf_rpc_evt(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC_RESULT, packet, sizeof(int) + length);
 	if (err) {
 		return -EINVAL;
 	}

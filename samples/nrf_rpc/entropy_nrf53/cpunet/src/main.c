@@ -9,8 +9,8 @@
 void main(void)
 {
 	/* The only activity of this application is interaction with the APP
-	 * core using serialized communication through the nRF_RPC library.
-	 * The necessary handlers are registered through nRF_RPC interface
+	 * core using serialized communication through the nRF RPC library.
+	 * The necessary handlers are registered through nRF RPC interface
 	 * and start at system boot.
 	 */
 	printk("Entropy sample started[NET Core].\n");

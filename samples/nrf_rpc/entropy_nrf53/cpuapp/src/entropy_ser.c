@@ -32,7 +32,7 @@ int entropy_remote_init(void)
 
 	NRF_RPC_ALLOC(packet, 0);
 
-	err = nrf_rpc_cmd_send(&entropy_group, RPC_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
+	err = nrf_rpc_cmd(&entropy_group, RPC_COMMAND_ENTROPY_INIT, packet, 0, rsp_error_code_handle, &result);
 	if (err < 0) {
 		return err;
 	}
@@ -76,7 +76,7 @@ int entropy_remote_get(u8_t *buffer, size_t length)
 
 	*(uint16_t *)&packet[0] = length;
 
-	err = nrf_rpc_cmd_send(&entropy_group, RPC_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), entropy_get_rsp, &result);
+	err = nrf_rpc_cmd(&entropy_group, RPC_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), entropy_get_rsp, &result);
 	if (err < 0) {
 		return err;
 	}
@@ -100,7 +100,7 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 
 	*(uint16_t *)&packet[0] = length;
 
-	err = nrf_rpc_cmd_rsp_send(&entropy_group, RPC_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), &rsp, &rsp_len);
+	err = nrf_rpc_cmd_rsp(&entropy_group, RPC_COMMAND_ENTROPY_GET, packet, sizeof(uint16_t), &rsp, &rsp_len);
 	if (err < 0) {
 		return err;
 	}
@@ -136,7 +136,7 @@ int entropy_remote_get_async(size_t length, void (*callback)(int result,
 
 	async_callback = callback;
 
-	err = nrf_rpc_evt_send(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC, packet, sizeof(uint16_t));
+	err = nrf_rpc_evt(&entropy_group, RPC_EVENT_ENTROPY_GET_ASYNC, packet, sizeof(uint16_t));
 	if (err < 0) {
 		return err;
 	}
