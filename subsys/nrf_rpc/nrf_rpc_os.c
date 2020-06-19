@@ -31,9 +31,9 @@ struct k_sem _nrf_rpc_os_remote_counter;
 static uint32_t remote_thread_total;
 
 static K_THREAD_STACK_ARRAY_DEFINE(pool_stacks,
-	CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE,
-	CONFIG_NRF_RPC_LOCAL_THREAD_STACK_SIZE);
-struct k_thread pool_threads[CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE];
+	CONFIG_NRF_RPC_THREAD_POOL_SIZE,
+	CONFIG_NRF_RPC_THREAD_STACK_SIZE);
+struct k_thread pool_threads[CONFIG_NRF_RPC_THREAD_POOL_SIZE];
 
 BUILD_ASSERT(CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE > 0,
 	     "CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE must be greaten than zero");
@@ -78,12 +78,12 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 
 	k_msgq_init(&pool_start_msg, (char*)pool_start_msg_buf, sizeof(struct pool_start_msg), ARRAY_SIZE(pool_start_msg_buf));
 
-	for (i = 0; i < CONFIG_NRF_RPC_LOCAL_THREAD_POOL_SIZE; i++) {
+	for (i = 0; i < CONFIG_NRF_RPC_THREAD_POOL_SIZE; i++) {
 		k_thread_create(&pool_threads[i], pool_stacks[i],
 			K_THREAD_STACK_SIZEOF(pool_stacks[i]),
 			thread_pool_entry,
 			NULL, NULL, NULL,
-			CONFIG_NRF_RPC_LOCAL_THREAD_PRIORITY, 0, K_NO_WAIT);
+			CONFIG_NRF_RPC_THREAD_PRIORITY, 0, K_NO_WAIT);
 	}
 
 	return 0;

@@ -8,64 +8,17 @@ menu "nRF RPC (Remote Procedure Call) library"
 
 if NRF_RPC
 
-menu "Local endpoints options"
-
-config NRF_RPC_LOCAL_EXTRA_EP_COUNT
-	int "Number of extra local endpoints"
-	range 1 32
-	default 3
-	help
-	  Number of extra local endpoints. This value corresponds to endpoints
-	  allocated for user threads not counting endpoints for thread pool.
-	  This value must be the same as NRF_RPC_REMOTE_EXTRA_EP_COUNT on the
-	  remote side.
-
-config NRF_RPC_LOCAL_THREAD_POOL_SIZE
-	int "Number of threads in local thread pool"
-	range 1 31
-	default 3
-	help
-	  Number of threads in local thread pool.
-	  This value must be the same as NRF_RPC_REMOTE_THREAD_POOL_SIZE on the
-	  remote side.
-
-
-config NRF_RPC_LOCAL_THREAD_STACK_SIZE
+config NRF_RPC_THREAD_STACK_SIZE
 	int "Stack size of thread from thread pool"
 	default 1024
 	help
 	  Stack size for each thread in local thread pool.
 
-config NRF_RPC_LOCAL_THREAD_PRIORITY
+config NRF_RPC_THREAD_PRIORITY
 	int "Priority of thread from thread pool"
 	default 2
 	help
 	  Thread priority of each thread in local thread pool.
-
-endmenu
-
-menu "Remote endpoints options"
-
-config NRF_RPC_REMOTE_EXTRA_EP_COUNT
-	int "Number of extra remote endpoints"
-	range 1 32
-	default 3
-	help
-	  Number of extra remote endpoints. This value corresponds to endpoints
-	  allocated for user threads not counting endpoints for thread pool.
-	  This value must be the same as NRF_RPC_LOCAL_EXTRA_EP_COUNT on the
-	  remote side.
-
-config NRF_RPC_REMOTE_THREAD_POOL_SIZE
-	int "Number of threads in remote thread pool"
-	range 1 31
-	default 3
-	help
-	  Number of threads in remote thread pool.
-	  This value must be the same as NRF_RPC_LOCAL_THREAD_POOL_SIZE on the
-	  remote side.
-
-endmenu
 
 choice
 	prompt "RPMSG device role"
