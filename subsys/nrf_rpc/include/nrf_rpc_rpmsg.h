@@ -35,7 +35,8 @@ typedef void (*nrf_rpc_tr_receive_handler_t)(const uint8_t *packet, size_t len);
 
 int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler_t callback);
 
-static inline void nrf_rpc_tr_free_rx_buf(const uint8_t *buf) {
+static inline void nrf_rpc_tr_free_rx_buf(const uint8_t *buf)
+{
 }
 
 #define nrf_rpc_tr_alloc_tx_buf(buf, len)				       \

@@ -10,7 +10,7 @@
 
 #include <nrf_rpc_cbor.h>
 
-#include "../../ser_common.h"
+#include "../../common_ids.h"
 
 
 #define CBOR_BUF_SIZE 16
@@ -161,7 +161,8 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length)
 	}
 
 	buflen = length;
-	cbor_err = cbor_value_copy_byte_string(&ctx.value, buffer, &buflen, NULL);
+	cbor_err = cbor_value_copy_byte_string(&ctx.value, buffer, &buflen,
+					       NULL);
 	if (cbor_err != CborNoError || buflen != length) {
 		goto cbor_error_exit;
 	}
@@ -244,6 +245,15 @@ NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_result,
 			 RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
 			 entropy_get_result_handler, NULL);
 
+
+static void err_handler(const struct nrf_rpc_err_report *report)
+{
+	printk("nRF RPC error %d ocurred. See nRF RPC logs for more details.",
+	       report->code);
+	k_oops();
+}
+
+
 static int serialization_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
@@ -252,7 +262,7 @@ static int serialization_init(struct device *dev)
 
 	printk("Init begin\n");
 
-	err = nrf_rpc_init(NULL);
+	err = nrf_rpc_init(err_handler);
 	if (err) {
 		return -EINVAL;
 	}

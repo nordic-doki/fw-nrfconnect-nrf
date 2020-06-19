@@ -9,6 +9,22 @@
 
 #include <zephyr.h>
 
+
+/**
+ * @defgroup nrf_rpc_os_zephyr nRF PRC OS abstraction for Zephyr.
+ * @{
+ * @brief nRF PRC OS abstraction for Zephyr.
+ *
+ * API is compatible with nrf_rpc_os API. For API documentation
+ * @see nrf_rpc_os_tmpl.h
+ */
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 struct nrf_rpc_os_event
 {
 	struct k_sem sem;
@@ -47,8 +63,11 @@ static inline int nrf_rpc_os_msg_init(struct nrf_rpc_os_msg *msg)
 	return k_sem_init(&msg->sem, 0, 1);
 }
 
-void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data, size_t len);
-void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data, size_t *len);
+void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data,
+			size_t len);
+
+void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data,
+			size_t *len);
 
 static inline void* nrf_rpc_os_tls_get(void)
 {
@@ -79,5 +98,12 @@ static inline void nrf_rpc_os_remote_release()
 	k_sem_give(&_nrf_rpc_os_remote_counter);
 }
 
+#ifdef __cplusplus
+}
+#endif
+
+/**
+ *@}
+ */
 
 #endif /* NRF_RPC_OS_H_ */

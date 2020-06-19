@@ -58,7 +58,7 @@ void main(void)
 		}
 
 		printk("\n");
-		
+
 
 		k_sleep(K_MSEC(2000));
 

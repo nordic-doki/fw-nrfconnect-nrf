@@ -65,7 +65,8 @@ static int translate_error(int rpmsg_err)
 
 /* Event callback from lower level. */
 static void ll_event_handler(struct rp_ll_endpoint *endpoint,
-	enum rp_ll_event_type event, const u8_t *buf, size_t length)
+			    enum rp_ll_event_type event, const u8_t *buf,
+			    size_t length)
 {
 	if (event == RP_LL_EVENT_CONNECTED) {
 

@@ -12,7 +12,7 @@
 
 #include <device.h>
 
-#include "../../ser_common.h"
+#include "../../common_ids.h"
 
 
 #define CBOR_BUF_SIZE 16
@@ -62,7 +62,8 @@ static void entropy_get_rsp(int err_code, const u8_t *data, size_t length)
 	nrf_rpc_cbor_rsp_no_err(&ctx);
 }
 
-static void entropy_get_result_evt(int err_code, const u8_t *data, size_t length)
+static void entropy_get_result_evt(int err_code, const u8_t *data,
+				   size_t length)
 {
 	struct nrf_rpc_cbor_ctx ctx;
 
@@ -71,7 +72,9 @@ static void entropy_get_result_evt(int err_code, const u8_t *data, size_t length
 	cbor_encode_int(&ctx.encoder, err_code);
 	cbor_encode_byte_string(&ctx.encoder, data, length);
 
-	nrf_rpc_cbor_evt_no_err(&entropy_group,RPC_EVENT_ENTROPY_GET_ASYNC_RESULT, &ctx);
+	nrf_rpc_cbor_evt_no_err(&entropy_group,
+				RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
+				&ctx);
 }
 
 static void entropy_get_handler(CborValue *packet, void *handler_data)
@@ -123,6 +126,15 @@ NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_async,
 			 RPC_EVENT_ENTROPY_GET_ASYNC, entropy_get_handler,
 			 (void *)1);
 
+
+static void err_handler(const struct nrf_rpc_err_report *report)
+{
+	printk("nRF RPC error %d ocurred. See nRF RPC logs for more details.",
+	       report->code);
+	k_oops();
+}
+
+
 static int serialization_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
@@ -131,7 +143,7 @@ static int serialization_init(struct device *dev)
 
 	printk("Init begin\n");
 
-	err = nrf_rpc_init(NULL);
+	err = nrf_rpc_init(err_handler);
 	if (err) {
 		return -EINVAL;
 	}

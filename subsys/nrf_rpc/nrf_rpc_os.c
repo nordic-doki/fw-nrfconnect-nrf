@@ -11,29 +11,34 @@
 /* Initial value contains ones (context free) on the
  * CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE most significant bits.
  */
-#define CONTEXT_MASK_INIT_VALUE \
-	(~(((atomic_val_t)1 << (8 * sizeof(atomic_val_t) - CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE)) - 1))
+#define CONTEXT_MASK_INIT_VALUE						       \
+	(~(((atomic_val_t)1 << (8 * sizeof(atomic_val_t) -		       \
+				CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE)) - 1))
+
 
 struct pool_start_msg {
 	const uint8_t *data;
 	size_t len;
 };
 
-nrf_rpc_os_work_t thread_pool_callback;
+
+static nrf_rpc_os_work_t thread_pool_callback;
 
 static struct pool_start_msg pool_start_msg_buf[2];
-struct k_msgq pool_start_msg;
+static struct k_msgq pool_start_msg;
 
 static struct k_sem context_reserved;
 static atomic_t context_mask;
 
-struct k_sem _nrf_rpc_os_remote_counter;
 static uint32_t remote_thread_total;
+
+struct k_sem _nrf_rpc_os_remote_counter;
 
 static K_THREAD_STACK_ARRAY_DEFINE(pool_stacks,
 	CONFIG_NRF_RPC_THREAD_POOL_SIZE,
 	CONFIG_NRF_RPC_THREAD_STACK_SIZE);
-struct k_thread pool_threads[CONFIG_NRF_RPC_THREAD_POOL_SIZE];
+
+static struct k_thread pool_threads[CONFIG_NRF_RPC_THREAD_POOL_SIZE];
 
 BUILD_ASSERT(CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE > 0,
 	     "CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE must be greaten than zero");
@@ -41,7 +46,6 @@ BUILD_ASSERT(CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE <= 8 * sizeof(atomic_val_t),
 	     "CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE too big");
 BUILD_ASSERT(sizeof(uint32_t) == sizeof(atomic_val_t),
 	     "Only atomic_val_t is implemented that is the same as uint32_t");
-
 
 
 static void thread_pool_entry(void *p1, void *p2, void *p3)
@@ -54,6 +58,7 @@ static void thread_pool_entry(void *p1, void *p2, void *p3)
 	} while(1);
 }
 
+
 int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 {
 	int err;
@@ -62,8 +67,9 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 	__ASSERT_NO_MSG(callback != NULL);
 
 	thread_pool_callback = callback;
-	
-	err = k_sem_init(&context_reserved, CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE, CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE);
+
+	err = k_sem_init(&context_reserved, CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE,
+			 CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE);
 	if (err < 0) {
 		return err;
 	}
@@ -76,7 +82,9 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 
 	atomic_set(&context_mask, CONTEXT_MASK_INIT_VALUE);
 
-	k_msgq_init(&pool_start_msg, (char*)pool_start_msg_buf, sizeof(struct pool_start_msg), ARRAY_SIZE(pool_start_msg_buf));
+	k_msgq_init(&pool_start_msg, (char*)pool_start_msg_buf,
+		    sizeof(struct pool_start_msg),
+		    ARRAY_SIZE(pool_start_msg_buf));
 
 	for (i = 0; i < CONFIG_NRF_RPC_THREAD_POOL_SIZE; i++) {
 		k_thread_create(&pool_threads[i], pool_stacks[i],
@@ -89,6 +97,7 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 	return 0;
 }
 
+
 void nrf_rpc_os_thread_pool_send(const uint8_t *data, size_t len)
 {
 	struct pool_start_msg msg;
@@ -97,7 +106,9 @@ void nrf_rpc_os_thread_pool_send(const uint8_t *data, size_t len)
 	k_msgq_put(&pool_start_msg, &msg, K_FOREVER);
 }
 
-void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data, size_t len)
+
+void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data,
+			size_t len)
 {
 	k_sched_lock();
 	msg->data = data;
@@ -106,7 +117,9 @@ void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data, size_t 
 	k_sched_unlock();
 }
 
-void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data, size_t *len)
+
+void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data,
+			size_t *len)
 {
 	k_sem_take(&msg->sem, K_FOREVER);
 	k_sched_lock();
@@ -134,6 +147,7 @@ uint32_t nrf_rpc_os_ctx_pool_reserve()
 	return number;
 }
 
+
 void nrf_rpc_os_ctx_pool_release(uint32_t number)
 {
 	__ASSERT_NO_MSG(number < CONFIG_NRF_RPC_CMD_CTX_POLL_SIZE);
@@ -141,6 +155,7 @@ void nrf_rpc_os_ctx_pool_release(uint32_t number)
 	atomic_or(&context_mask, 0x80000000u >> number);
 	k_sem_give(&context_reserved);
 }
+
 
 void nrf_rpc_os_remote_count(int count)
 {
