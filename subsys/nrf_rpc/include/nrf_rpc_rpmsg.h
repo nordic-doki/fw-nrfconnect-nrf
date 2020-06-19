@@ -30,7 +30,7 @@ extern "C" {
 #define NRF_RPC_TR_AUTO_FREE_RX_BUF 1
 
 
-typedef void (*nrf_rpc_tr_receive_handler_t)(const uint8_t *packet, size_t len);
+typedef void (*nrf_rpc_tr_receive_handler_t)(const u8_t *packet, size_t len);
 
 
 int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler_t callback);
@@ -40,13 +40,12 @@ static inline void nrf_rpc_tr_free_rx_buf(const uint8_t *buf)
 }
 
 #define nrf_rpc_tr_alloc_tx_buf(buf, len)				       \
-	uint32_t _nrf_rpc_tr_buf_vla[(sizeof(uint32_t) - 1 + (len)) /	       \
-				     sizeof(uint32_t)];			       \
-	*(buf) = (uint8_t *)(&_nrf_rpc_tr_buf_vla)
+	u32_t _nrf_rpc_tr_buf_vla[(sizeof(u32_t) - 1 + (len)) /	sizeof(u32_t)];\
+	*(buf) = (u8_t *)(&_nrf_rpc_tr_buf_vla)
 
 #define nrf_rpc_tr_free_tx_buf(buf)
 
-int nrf_rpc_tr_send(uint8_t *buf, size_t len);
+int nrf_rpc_tr_send(u8_t *buf, size_t len);
 
 
 #ifdef __cplusplus

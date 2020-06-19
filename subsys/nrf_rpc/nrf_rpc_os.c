@@ -17,7 +17,7 @@
 
 
 struct pool_start_msg {
-	const uint8_t *data;
+	const u8_t *data;
 	size_t len;
 };
 
@@ -30,7 +30,7 @@ static struct k_msgq pool_start_msg;
 static struct k_sem context_reserved;
 static atomic_t context_mask;
 
-static uint32_t remote_thread_total;
+static u32_t remote_thread_total;
 
 struct k_sem _nrf_rpc_os_remote_counter;
 
@@ -55,7 +55,7 @@ static void thread_pool_entry(void *p1, void *p2, void *p3)
 	do {
 		k_msgq_get(&pool_start_msg, &msg, K_FOREVER);
 		thread_pool_callback(msg.data, msg.len);
-	} while(1);
+	} while (1);
 }
 
 
@@ -82,7 +82,7 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 
 	atomic_set(&context_mask, CONTEXT_MASK_INIT_VALUE);
 
-	k_msgq_init(&pool_start_msg, (char*)pool_start_msg_buf,
+	k_msgq_init(&pool_start_msg, (char *)pool_start_msg_buf,
 		    sizeof(struct pool_start_msg),
 		    ARRAY_SIZE(pool_start_msg_buf));
 
@@ -98,9 +98,10 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 }
 
 
-void nrf_rpc_os_thread_pool_send(const uint8_t *data, size_t len)
+void nrf_rpc_os_thread_pool_send(const u8_t *data, size_t len)
 {
 	struct pool_start_msg msg;
+
 	msg.data = data;
 	msg.len = len;
 	k_msgq_put(&pool_start_msg, &msg, K_FOREVER);
@@ -129,9 +130,9 @@ void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data,
 }
 
 
-uint32_t nrf_rpc_os_ctx_pool_reserve()
+u32_t nrf_rpc_os_ctx_pool_reserve(void)
 {
-	uint32_t number;
+	u32_t number;
 	atomic_val_t mask_shadow;
 	atomic_val_t this_mask;
 

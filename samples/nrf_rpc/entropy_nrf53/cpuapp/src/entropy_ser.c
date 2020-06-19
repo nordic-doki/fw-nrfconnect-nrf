@@ -237,7 +237,6 @@ static void entropy_get_result_handler(CborValue *value, void *handler_data)
 cbor_error_exit:
 	nrf_rpc_cbor_decoding_done(value);
 	async_callback(-EINVAL, buf, 0);
-	return;
 }
 
 
