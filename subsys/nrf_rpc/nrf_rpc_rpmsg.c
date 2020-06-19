@@ -34,7 +34,7 @@
 K_SEM_DEFINE(handshake_sem, 0, 1);
 
 /* Upper level callbacks */
-static nrf_rpc_tr_receive_handler receive_callback;
+static nrf_rpc_tr_receive_handler_t receive_callback;
 
 /* Lower level endpoint instance */
 static struct rp_ll_endpoint ll_endpoint;
@@ -87,7 +87,7 @@ static void ll_event_handler(struct rp_ll_endpoint *endpoint,
 }
 
 
-int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback)
+int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler_t callback)
 {
 	int err = 0;
 

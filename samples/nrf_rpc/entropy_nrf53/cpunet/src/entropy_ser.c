@@ -13,7 +13,7 @@
 
 #include "../../ser_common.h"
 
-NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL);
+NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_rpc_entropy_sample", NULL, NULL, NULL);
 
 static struct device *entropy;
 
@@ -130,7 +130,7 @@ static int serialization_init(struct device *dev)
 
 	printk("Init begin\n");
 
-	err = nrf_rpc_init();
+	err = nrf_rpc_init(NULL);
 	if (err) {
 		return -EINVAL;
 	}

@@ -30,10 +30,10 @@ extern "C" {
 #define NRF_RPC_TR_AUTO_FREE_RX_BUF 1
 
 
-typedef void (*nrf_rpc_tr_receive_handler)(const uint8_t *packet, size_t len);
+typedef void (*nrf_rpc_tr_receive_handler_t)(const uint8_t *packet, size_t len);
 
 
-int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler callback);
+int nrf_rpc_tr_init(nrf_rpc_tr_receive_handler_t callback);
 
 static inline void nrf_rpc_tr_free_rx_buf(const uint8_t *buf) {
 }
