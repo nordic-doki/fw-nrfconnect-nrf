@@ -16,7 +16,7 @@ The :ref:`nrf_rpc` uses the `TinyCBOR`_ data format and transmits the data using
 The application core uses serialized function calls such as :cpp:func:`entropy_remote_init` and :cpp:func:`entropy_remote_get` to control the entropy driver on the network core.
 The :cpp:func:`entropy_remote_init` function is used for initializing the entropy, and the :cpp:func:`entropy_remote_get` function is used for obtaining the entropy data.
 
-When the sample starts, it displays the generated entropy data in the terminal at an interval of one second.
+When the sample starts, it displays the generated entropy data in the terminal at an interval of two seconds.
 
 Network core
 ============
