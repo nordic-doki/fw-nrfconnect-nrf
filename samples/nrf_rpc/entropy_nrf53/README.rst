@@ -3,9 +3,9 @@
 nRF5340: nRF RPC Entropy
 ########################
 
-The nRF `RPC`_ Entropy sample demonstrates how to use the entropy driver in a dual core device such as nRF5340 PDK.
+The nRF RPC Entropy sample demonstrates how to use the entropy driver in a dual core device such as nRF5340 PDK.
 
-The sample makes use of the entropy driver on the network core of an nRF5340 PDK that generates random data, and the :ref:`nrf_rpc` that sends the generated data to the application core.
+The sample makes use of the entropy driver on the network core of an nRF5340 PDK that generates random data, and the :ref:`nrf_rpc` that sends the generated data to the application core using `Remote Procedure Calls (RPC)`_.
 
 Overview
 ********
@@ -35,9 +35,11 @@ The application core runs a simple application that replaces the entropy driver 
 Requirements
 ************
 
-* The following development board:
+The sample supports the following development kit:
 
-  * |nRF5340DK|
+.. include:: /includes/boardname_tables/sample_boardnames.txt
+   :start-after: set18_start
+   :end-before: set18_end
 
 
 Building and running
