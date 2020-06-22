@@ -381,7 +381,7 @@
 
 .. _`RFC959 File Transfer Protocol (FTP)`: https://tools.ietf.org/html/rfc959
 
-.. _`RPC`: https://en.wikipedia.org/wiki/Remote_procedure_call
+.. _`Remote Procedure Calls (RPC)`: https://en.wikipedia.org/wiki/Remote_procedure_call
 
 .. ### Links to specific files on GitHub
 
