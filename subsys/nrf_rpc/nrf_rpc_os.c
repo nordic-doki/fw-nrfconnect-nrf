@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
 
 #define NRF_RPC_LOG_MODULE NRF_RPC_OS
 #include <nrf_rpc_log.h>

@@ -131,4 +131,3 @@ int nrf_rpc_tr_send(u8_t *buf, size_t len)
 
 	return translate_error(err);
 }
-
