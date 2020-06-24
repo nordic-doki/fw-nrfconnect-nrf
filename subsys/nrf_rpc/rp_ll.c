@@ -26,8 +26,9 @@ static struct k_work work_item;
 #define EP_FLAG_HANSHAKE_DONE 1
 
 /* Shared memory configuration */
-#define SHM_START_ADDR      (DT_IPC_SHM_BASE_ADDRESS + 0x400)
-#define SHM_SIZE            0x7c00
+#define SHM_NODE            DT_CHOSEN(zephyr_ipc_shm)
+#define SHM_START_ADDR      (DT_REG_ADDR(SHM_NODE) + 0x400)
+#define SHM_SIZE            (DT_REG_SIZE(SHM_NODE) - 0x400)
 #define SHM_DEVICE_NAME     "sram0.shm"
 
 #define VRING_COUNT         2
@@ -36,7 +37,10 @@ static struct k_work work_item;
 #define VRING_ALIGNMENT     4
 #define VRING_SIZE          16
 
-#define VDEV_STATUS_ADDR    DT_IPC_SHM_BASE_ADDRESS
+#define VDEV_STATUS_ADDR    DT_REG_ADDR(SHM_NODE)
+
+BUILD_ASSERT(VRING_TX_ADDRESS >= SHM_START_ADDR);
+BUILD_ASSERT(VRING_RX_ADDRESS >= SHM_START_ADDR);
 
 
 /* Handlers for TX and RX channels */

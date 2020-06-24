@@ -3,15 +3,14 @@
 #
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.13.1)
 
 set(NRF_SUPPORTED_BOARDS
   nrf5340pdk_nrf5340_cpunet
 )
 
-include(../../../../cmake/boilerplate.cmake)
-include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(NONE)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(entropy_nrf53_cpuapp)
 
 # NORDIC SDK APP START
 target_sources(app PRIVATE
