@@ -23,7 +23,7 @@ struct entropy_get_result {
 };
 
 
-static void (*async_callback)(int result, u8_t *buffer, size_t length);
+static void (*result_callback)(int result, u8_t *buffer, size_t length);
 
 
 NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy", NULL, NULL, NULL);
@@ -187,7 +187,7 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result,
 		return -EINVAL;
 	}
 
-	async_callback = callback;
+	result_callback = callback;
 
 	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
 
@@ -203,15 +203,45 @@ int entropy_remote_get_async(u16_t length, void (*callback)(int result,
 }
 
 
+int entropy_remote_get_cbk(u16_t length, void (*callback)(int result,
+							  u8_t *buffer,
+							  size_t length))
+{
+	int err;
+	int result;
+	struct nrf_rpc_cbor_ctx ctx;
+
+	if (length < 1 || callback == NULL) {
+		return -EINVAL;
+	}
+
+	result_callback = callback;
+
+	NRF_RPC_CBOR_ALLOC(ctx, CBOR_BUF_SIZE);
+
+	cbor_encode_int(&ctx.encoder, length);
+
+	err = nrf_rpc_cbor_cmd(&entropy_group, RPC_COMMAND_ENTROPY_GET_CBK,
+			       &ctx, rsp_error_code_handle, &result);
+	if (err) {
+		return -EINVAL;
+	}
+
+	return result;
+}
+
+
 static void entropy_get_result_handler(CborValue *value, void *handler_data)
 {
+	bool is_command = (handler_data != NULL);
 	int err_code;
 	CborError err;
 	size_t length;
 	u8_t buf[32];
 
-	if (async_callback == NULL) {
+	if (result_callback == NULL) {
 		nrf_rpc_cbor_decoding_done(value);
+		return;
 	}
 
 	err = cbor_value_get_int(value, &err_code);
@@ -231,16 +261,29 @@ static void entropy_get_result_handler(CborValue *value, void *handler_data)
 	}
 
 	nrf_rpc_cbor_decoding_done(value);
-	async_callback(err_code, buf, length);
+
+	result_callback(err_code, buf, length);
+
+	if (is_command) {
+		struct nrf_rpc_cbor_ctx ctx;
+
+		NRF_RPC_CBOR_ALLOC(ctx, 0);
+		nrf_rpc_cbor_rsp_no_err(&ctx);
+	}
+
 	return;
 
 cbor_error_exit:
 	nrf_rpc_cbor_decoding_done(value);
-	async_callback(-EINVAL, buf, 0);
+	result_callback(-EINVAL, buf, 0);
 }
 
 
-NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_result,
+NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get_cbk_result,
+			 RPC_COMMAND_ENTROPY_GET_CBK_RESULT,
+			 entropy_get_result_handler, (void *)1);
+
+NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_async_result,
 			 RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
 			 entropy_get_result_handler, NULL);
 

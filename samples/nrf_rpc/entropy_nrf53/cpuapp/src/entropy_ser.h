@@ -29,6 +29,8 @@ int entropy_remote_init(void);
 
 /**@brief Function for getting entropy value from the remote driver.
  *
+ * This function demonstrates simples use of a command.
+ *
  * @param[out] buffer Received entropy data.
  * @param[in] length Requested entropy length.
  *
@@ -53,6 +55,9 @@ int entropy_remote_get_inline(u8_t *buffer, size_t length);
 /**@brief Function for getting entropy value from the remote driver in an
  * asynchronous way.
  *
+ * This function demonstates how to use events to accomplish asynchronous API
+ * calls.
+ *
  * @param[in] length Requested entropy length.
  * @param[in] callback Results will be passed to this callback.
  *
@@ -63,6 +68,21 @@ int entropy_remote_get_async(size_t length, void (*callback)(int result,
 							     u8_t *buffer,
 							     size_t length));
 
+/**@brief Function for getting entropy value in a callback from the remote
+ * driver.
+ *
+ * This function executes synchronous callback to demonstrate reuse of
+ * a thread that is waiting for a response.
+ *
+ * @param[in] length   Requested entropy length.
+ * @param[in] callback Results will be passed to this callback.
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+int entropy_remote_get_cbk(u16_t length, void (*callback)(int result,
+							  u8_t *buffer,
+							  size_t length));
 #ifdef __cplusplus
 }
 #endif

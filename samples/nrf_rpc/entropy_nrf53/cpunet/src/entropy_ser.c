@@ -17,6 +17,12 @@
 
 #define CBOR_BUF_SIZE 16
 
+enum call_type {
+	CALL_TYPE_STANDARD,
+	CALL_TYPE_CBK,
+	CALL_TYPE_ASYNC,
+};
+
 NRF_RPC_GROUP_DEFINE(entropy_group, "nrf_sample_entropy", NULL, NULL, NULL);
 
 static struct device *entropy;
@@ -62,8 +68,12 @@ static void entropy_get_rsp(int err_code, const u8_t *data, size_t length)
 	nrf_rpc_cbor_rsp_no_err(&ctx);
 }
 
-static void entropy_get_result_evt(int err_code, const u8_t *data,
-				   size_t length)
+static void rsp_empty_handler(CborValue *value, void *handler_data)
+{
+}
+
+static void entropy_get_result(int err_code, const u8_t *data, size_t length,
+			       enum call_type type)
 {
 	struct nrf_rpc_cbor_ctx ctx;
 
@@ -72,9 +82,15 @@ static void entropy_get_result_evt(int err_code, const u8_t *data,
 	cbor_encode_int(&ctx.encoder, err_code);
 	cbor_encode_byte_string(&ctx.encoder, data, length);
 
-	nrf_rpc_cbor_evt_no_err(&entropy_group,
-				RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
-				&ctx);
+	if (type == CALL_TYPE_ASYNC) {
+		nrf_rpc_cbor_evt_no_err(&entropy_group,
+					RPC_EVENT_ENTROPY_GET_ASYNC_RESULT,
+					&ctx);
+	} else {
+		nrf_rpc_cbor_cmd_no_err(&entropy_group,
+					RPC_COMMAND_ENTROPY_GET_CBK_RESULT,
+					&ctx, rsp_empty_handler, NULL);
+	}
 }
 
 static void entropy_get_handler(CborValue *packet, void *handler_data)
@@ -83,7 +99,7 @@ static void entropy_get_handler(CborValue *packet, void *handler_data)
 	int err;
 	int length;
 	u8_t *buf;
-	uintptr_t async = (uintptr_t)handler_data;
+	enum call_type type = (enum call_type)handler_data;
 
 	cbor_err = cbor_value_get_int(packet, &length);
 
@@ -102,10 +118,19 @@ static void entropy_get_handler(CborValue *packet, void *handler_data)
 
 	err = entropy_get_entropy(entropy, buf, length);
 
-	if (async) {
-		entropy_get_result_evt(err, buf, length);
-	} else {
+	switch (type) {
+	case CALL_TYPE_STANDARD:
 		entropy_get_rsp(err, buf, length);
+		break;
+
+	case CALL_TYPE_CBK:
+		entropy_get_result(err, buf, length, type);
+		rsp_error_code_send(err);
+		break;
+
+	case CALL_TYPE_ASYNC:
+		entropy_get_result(err, buf, length, type);
+		break;
 	}
 
 	k_free(buf);
@@ -113,18 +138,33 @@ static void entropy_get_handler(CborValue *packet, void *handler_data)
 	return;
 
 error_exit:
-	if (async) {
-		entropy_get_result_evt(err, "", 0);
-	} else {
+	switch (type) {
+	case CALL_TYPE_STANDARD:
 		entropy_get_rsp(err, "", 0);
+		break;
+
+	case CALL_TYPE_CBK:
+		rsp_error_code_send(err);
+		break;
+
+	case CALL_TYPE_ASYNC:
+		entropy_get_result(err, "", 0, type);
+		break;
 	}
 }
 
-NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get, RPC_COMMAND_ENTROPY_GET,
-			 entropy_get_handler, (void *)0);
+
+NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get,
+			 RPC_COMMAND_ENTROPY_GET, entropy_get_handler,
+			 (void *)CALL_TYPE_STANDARD);
+
+NRF_RPC_CBOR_CMD_DECODER(entropy_group, entropy_get_cbk,
+			 RPC_COMMAND_ENTROPY_GET_CBK, entropy_get_handler,
+			 (void *)CALL_TYPE_CBK);
+
 NRF_RPC_CBOR_EVT_DECODER(entropy_group, entropy_get_async,
 			 RPC_EVENT_ENTROPY_GET_ASYNC, entropy_get_handler,
-			 (void *)1);
+			 (void *)CALL_TYPE_ASYNC);
 
 
 static void err_handler(const struct nrf_rpc_err_report *report)
