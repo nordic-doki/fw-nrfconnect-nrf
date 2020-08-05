@@ -4,12 +4,20 @@
 	
 	"source-pairs": [
 		{
-			"cli": "client/bt_rpc_gap_cli.c",
+			"cli": "client/bt_rpc_gap_client.c",
 			"host": "host/bt_rpc_gap_host.c"
 		},
 		{
-			"cli": "client/bt_rpc_conn_cli.c",
+			"cli": "client/bt_rpc_conn_client.c",
 			"host": "host/bt_rpc_conn_host.c"
+		},
+		{
+			"cli": "client/bt_rpc_gatt_svc_client.c",
+			"host": "host/bt_rpc_gatt_svc_host.c"
+		},
+		{
+			"cli": "client/bt_rpc_gatt_dis_client.c",
+			"host": "host/bt_rpc_gatt_dis_host.c"
 		}
 	],
 	"cmd-id-pattern": "$_RPC_CMD",

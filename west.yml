@@ -35,6 +35,8 @@ manifest:
       url-base: https://github.com/alexa
     - name: nordicsemi
       url-base: https://github.com/NordicSemiconductor
+    - name: doki-nordic
+      url-base: https://github.com/doki-nordic
 
   # If not otherwise specified, the projects below should be obtained
   # from the ncs remote.
@@ -145,6 +147,10 @@ manifest:
       remote: nordicsemi
       revision: 24f1b2b0c64c694b7f9ac1b7eab60b39236ca0bf
       path: modules/lib/cddl-gen
+    - name: nrf_rpc_generator
+      remote: doki-nordic
+      revision: 0c17f11e670593b2355824605e65207291ea0a5b
+      path: nrf_rpc_generator
 
   # West-related configuration for the nrf repository.
   self:

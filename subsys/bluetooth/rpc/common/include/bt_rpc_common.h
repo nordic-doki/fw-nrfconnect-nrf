@@ -16,6 +16,7 @@
 
 #include "bluetooth/bluetooth.h"
 #include "bluetooth/conn.h"
+#include "bluetooth/gatt.h"
 
 #include "nrf_rpc_cbor.h"
 
@@ -103,6 +104,11 @@ enum bt_rpc_cmd_from_cli_to_host
 	BT_CONN_FOREACH_RPC_CMD,
 	BT_CONN_LOOKUP_ADDR_LE_RPC_CMD,
 	BT_CONN_GET_DST_OUT_RPC_CMD,
+	/* gatt.h API */
+	BT_GATT_NOTIFY_CB_RPC_CMD,
+	BT_RPC_GATT_START_SERVICE_RPC_CMD,
+	BT_RPC_GATT_SEND_SIMPLE_ATTR_RPC_CMD,
+	BT_RPC_GATT_SEND_DESC_ATTR_RPC_CMD,
 };
 
 /** @brief Host commands and events IDs used in bluetooth API serialization.
@@ -174,6 +180,7 @@ typedef void (*bt_le_ext_adv_cb_connected)(struct bt_le_ext_adv *adv,
 			  struct bt_le_ext_adv_connected_info *info);
 typedef void (*bt_le_ext_adv_cb_scanned)(struct bt_le_ext_adv *adv,
 			struct bt_le_ext_adv_scanned_info *info);
+
 
 NRF_RPC_GROUP_DECLARE(bt_rpc_grp);
 
