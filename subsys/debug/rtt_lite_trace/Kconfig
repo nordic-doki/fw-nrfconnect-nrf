@@ -120,7 +120,7 @@ endchoice
 
 choice RTT_LITE_TRACE_BUFFER_SIZE
 	prompt "RTT buffer size"
-	default RTT_LITE_TRACE_BUFFER_SIZE_2KB
+	default RTT_LITE_TRACE_BUFFER_SIZE_8KB
 	help
 	  Size of the RTT buffer to transfer events.
 

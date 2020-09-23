@@ -24,7 +24,7 @@
 #define RTT_LITE_TRACE_LEVEL_ERR 2
 
 #define RTT_LITE_TRACE_FORMAT_INIT(_level, format_string) { \
-	.text = (format_string), .id = 0, .level = (_level) .args = { 0 } }
+	.text = (format_string), .id = 0, .level = (_level), .args = { 0 } }
 
 #define RTT_LITE_TRACE_PRINTF(level, format_string, ...) \
 	do { \

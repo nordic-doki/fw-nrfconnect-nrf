@@ -29,7 +29,7 @@
  *         bits. Else it contains minimum free space of RTT buffer if
  *         CONFIG_RTT_LITE_TRACE_BUFFER_STATS is set.
  */
-#define EV_BUFFER_CYCLE 0x01000000
+#define EV_CYCLE 0x01000000
 
 /** @brief Event reporting change of thread priority.
  *
@@ -85,10 +85,8 @@
 
 /** @brief Sends format information for formatted text output.
  * 
- * Buffer is send immediately after this event. It contains null terminated
- * format string at the beginnign and null terminated format arguments list
- * after that. The list contains type of each argument on each byte, see
- * FORMAT_ARG_xyz definitions.
+ * Buffer containing format string is send immediately before this event.
+ * It is not null-terminated.
  *
  * @param additional Unused.
  * @param param      Format id.
@@ -97,7 +95,7 @@
 
 /** @brief Start sending buffer.
  * 
- * Buffers are send immediately after specific events to provide more data.
+ * Buffers are send immediately before specific events to provide more data.
  * In the same time two thread may send buffers, so the receiving part have to
  * assemble buffer back separately for each thread.
  * 
@@ -162,11 +160,11 @@
  * 
  * @param param      Number of events that were skipped because of overflow.
  */
-#define EV_BUFFER_OVERFLOW 0x12000000
+#define EV_OVERFLOW 0x12000000
 
 /** @brief Event send when systems goes into idle.
  * 
- * @param param       The same as EV_BUFFER_CYCLE.
+ * @param param       The same as EV_CYCLE.
  */
 #define EV_IDLE 0x13000000
 
@@ -233,7 +231,7 @@
 
 /** @brief Event send to print when formated text.
  * 
- * Buffer is send immediately after this event. If format id is 0xFFFFFF it
+ * Buffer is send immediately before this event. If format id is 0xFFFFFF it
  * contais format string and arguments list (see EV_FORMAT for details). After
  * that buffer contains arguments according to arguments list:
  *     * FORMAT_ARG_INT32 - 4 byte integer,
@@ -241,14 +239,14 @@
  *     * FORMAT_ARG_STRING - null terminated text string.
  * 
  * @param param       Bits 0:23 - Id of previously send format or
- *         0xFFFFFF if format will be contained in the following buffer.
+ *         0xFFFFFF if format was contained in the buffer.
  *         Bits 24:31 - Level of the message, see RTT_LITE_TRACE_LEVEL_xyz.
  */
 #define EV_PRINTF 0x1E000000
 
 /** @brief Event send to print a string.
  * 
- * If string is longer than 3 characters buffer is send immediately after this
+ * If string is longer than 3 characters buffer is send immediately before this
  * event containign the rest of the string (not including null terminator).
  * 
  * @param param       First 4 characters of the string including null
@@ -256,9 +254,15 @@
  */
 #define EV_PRINT 0x1F000000
 
+/** @brief Event send periodically to allow synchronization of the stream.
+ * 
+ * Each byte of the event is not a valid event id, so it gives the hint to the
+ * parser that this is a synchronization event.
+ * 
+ * @param additional  Always SYNC_ADDITIONAL.
+ * @param param       Always SYNC_PARAM.
+ */
 #define EV_SYNC_FIRST 0x78000000
-#define SYNC_ADDITIONAL 0x007C7E79
-#define SYNC_PARAM 0x7F7D7A7B
 
 /*
  * Events with 24-bit time stamp and 7-bit ISR number.
@@ -276,6 +280,9 @@
  */
 #define EV_ISR_ENTER 0x80000000
 
+
+#define SYNC_ADDITIONAL 0x007C7E79
+#define SYNC_PARAM 0x7F7D7A7B
 
 #define FORMAT_ARG_END 0
 #define FORMAT_ARG_INT32 1
@@ -398,7 +405,7 @@ static ALWAYS_INLINE void send_event_inner(u32_t event, u32_t param, u32_t time,
 				RTT_BUFFER_U32(cnt)++;
 				goto unlock_and_return;
 			}
-			event = EV_BUFFER_OVERFLOW | get_time();
+			event = EV_OVERFLOW | get_time();
 			param = 1;
 		}
 		RTT_BUFFER_U32(index) = event;
@@ -511,7 +518,7 @@ static void initialize(void)
 		up->WrOff = 0u;
 		up->Flags = SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL;
 
-		RTT_BUFFER_U32(RTT_BUFFER_BYTES) = EV_BUFFER_CYCLE;
+		RTT_BUFFER_U32(RTT_BUFFER_BYTES) = EV_CYCLE;
 		if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FAST_OVERFLOW_CHECK)) {
 			RTT_BUFFER_U32(RTT_BUFFER_BYTES + 4) = 1;
 		} else {
@@ -643,6 +650,7 @@ static void send_buffers(struct send_buffer_context *buf, const void *data,
 		memcpy(dst, src, left);
 		buf->used += left;
 		src += left;
+		size -= left;
 		if (buf->used == 7) {
 			send_timeless(buf->data[1], buf->data[0]);
 			buf->used = 0;
@@ -682,7 +690,7 @@ static u8_t parse_format_arg(const char **pp)
 		/* `  a  b  c  d  e  f  g  h  i  j  k  l  m  n  o */
 		   0, 0, 0, 7, 7, 2, 2, 2, 9, 7, 0, 0, 8, 0, 0, 7,
 		/* p  q  r  s  t  u  v  w  x  y  z  {  |  }  ~    */
-		   7, 0, 0, 3, 0, 7, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0,
+		   7, 0, 0, 3, 0, 7, 0, 0, 7,/*0,0, 0, 0, 0, 0, 0,*/
 	};
 	const char *p = *pp;
 	int long_count = 0;
@@ -690,7 +698,7 @@ static u8_t parse_format_arg(const char **pp)
 	u8_t result = FORMAT_ARG_END;
 
 	while (*p) {
-		type = (*p < ' ' || *p > '~') ? 0 : table[*p - ' '];
+		type = (*p < ' ' || *p > 'x') ? 0 : table[*p - ' '];
 		p++;
 		if (type < 7) {
 			result = type;
@@ -733,28 +741,27 @@ static void parse_format_args(struct rtt_lite_trace_format *format)
 static void prepare_format(struct rtt_lite_trace_format *format)
 {
 	static volatile u32_t last_format_id; /* zero-initialied after reset */
+	u32_t this_format_id;
 	int key;
 
 	parse_format_args(format);
 
 	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
-		key = irq_lock();
-		format->id = last_format_id + 1;
-		last_format_id = format->id;
-		irq_unlock(key);
-	} else {
-		format->id = 0x00FFFFFF;
-	}
-
-	format->id |= ((u32_t)format->level << 24);
-
-	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
 		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
-		send_timeless(EV_FORMAT, format->id);
-		send_buffers(&buf, format->text, strlen(format->text) + 1);
-		send_buffers(&buf, format->args, strlen(format->args) + 1);
+		key = irq_lock();
+		this_format_id = last_format_id + 1;
+		last_format_id = this_format_id;
+		irq_unlock(key);
+
+		this_format_id |= ((u32_t)format->level << 24);
+		send_buffers(&buf, format->text, strlen(format->text));
 		done_buffers(&buf);
+		send_timeless(EV_FORMAT, this_format_id);
+		format->id = this_format_id;
+	} else {
+		format->id = 0x00FFFFFF;
+		format->id |= ((u32_t)format->level << 24);
 	}
 }
 
@@ -770,10 +777,9 @@ void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...)
 	if (format->id == 0) {
 		prepare_format(format);
 	}
-	rtt_lite_trace_event(EV_PRINTF, format->id);
 	if (!IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
 		send_buffers(&buf, format->text, strlen(format->text) + 1);
-		send_buffers(&buf, format->args, strlen(format->args) + 1);
+		send_buffers(&buf, format->args, strlen(format->args));
 	}
 	p = format->args;
 	va_start(vl, format);
@@ -796,6 +802,7 @@ void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...)
 	}
 	va_end(vl);
 	done_buffers(&buf);
+	rtt_lite_trace_event(EV_PRINTF, format->id);
 }
 
 u32_t rtt_lite_trace_time(void)
@@ -818,9 +825,9 @@ void rtt_lite_trace_print(u32_t level, const char *text)
 		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 		memcpy(conv.in, text, 4);
-		rtt_lite_trace_event(EV_PRINT, conv.out);
 		send_buffers(&buf, &text[4], len - 4);
 		done_buffers(&buf);
+		rtt_lite_trace_event(EV_PRINT, conv.out);
 	}
 }
 
@@ -836,7 +843,6 @@ void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 	u32_t val;
 	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
-	rtt_lite_trace_event(event, arg1);
 	va_start(vl, arg1);
 	for (i = 1; i < num_args; i++) {
 		val = va_arg(vl, u32_t);
@@ -844,13 +850,14 @@ void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 	}
 	va_end(vl);
 	done_buffers(&buf);
+	rtt_lite_trace_event(event, arg1);
 }
 
 void rtt_lite_trace_name(u32_t resource_id, const char *name)
 {
 	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
-	send_timeless(EV_RES_NAME, resource_id);
-	send_buffers(&buf, name, strlen(name) + 1);
+	send_buffers(&buf, name, strlen(name));
 	done_buffers(&buf);
+	send_timeless(EV_RES_NAME, resource_id);
 }
