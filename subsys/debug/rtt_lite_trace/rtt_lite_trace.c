@@ -68,7 +68,8 @@
 #define FORMAT_ARG_INT64 2
 #define FORMAT_ARG_STRING 3
 
-/** RTT channel name used to identify transfer channel. */
+
+/* RTT channel name used to identify transfer channel. */
 #define CHANNEL_NAME "NrfLiteTrace"
 
 
@@ -123,12 +124,14 @@ static const nrfx_timer_t timer = NRFX_TIMER_INSTANCE(4);
 #define RTT_BUFFER_U32(byte_index) (*(volatile u32_t*) \
 		(&RTT_BUFFER_U8(byte_index)))
 
-#define INIT_BUFFER_CONTEXT { .used = 0, .data = { 0, EV_BUFFER_BEGIN } }
+#define INIT_SEND_BUFFER_CONTEXT { .used = 0, .data = { 0, EV_BUFFER_BEGIN } }
 
-struct buffer_context {
+
+struct send_buffer_context {
 	size_t used;
 	u32_t data[2];
 };
+
 
 static u32_t rtt_buffer[RTT_BUFFER_WORDS + 2];
 
@@ -396,7 +399,7 @@ void sys_trace_end_call(u32_t id)
 
 #endif /* CONFIG_RTT_LITE_TRACE_SYNCHRO */
 
-static void send_buffers(struct buffer_context *buf, const void *data,
+static void send_buffers(struct send_buffer_context *buf, const void *data,
 		size_t size)
 {
 	size_t left;
@@ -421,7 +424,7 @@ static void send_buffers(struct buffer_context *buf, const void *data,
 	}
 }
 
-static void done_buffers(struct buffer_context *buf)
+static void done_buffers(struct send_buffer_context *buf)
 {
 	u32_t event = buf->data[1] & 0xFF000000;
 
@@ -502,7 +505,7 @@ static void parse_format_args(struct rtt_lite_trace_format *format)
 static void prepare_format(struct rtt_lite_trace_format *format)
 {
 	static volatile u32_t last_format_id; /* zero-initialied after reset */
-	struct buffer_context buf = INIT_BUFFER_CONTEXT;
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 	int key;
 
 	parse_format_args(format);
@@ -533,7 +536,7 @@ void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...)
 	const char *val_str;
 	va_list vl;
 	u8_t *p;
-	struct buffer_context buf = INIT_BUFFER_CONTEXT;
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 	if (format->id == 0) {
 		prepare_format(format);
@@ -583,7 +586,7 @@ void rtt_lite_trace_print(u32_t level, const char *text)
 		strcpy(conv.in, text);
 		rtt_lite_trace_event(EV_PRINT, conv.out);
 	} else {
-		struct buffer_context buf = INIT_BUFFER_CONTEXT;
+		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 		memcpy(conv.in, text, 4);
 		rtt_lite_trace_event(EV_PRINT, conv.out);
@@ -602,7 +605,7 @@ void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 	u32_t i;
 	va_list vl;
 	u32_t val;
-	struct buffer_context buf = INIT_BUFFER_CONTEXT;
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 	rtt_lite_trace_event(event, arg1);
 	va_start(vl, arg1);
@@ -616,7 +619,7 @@ void rtt_lite_trace_call_v(u32_t event, u32_t num_args, u32_t arg1, ...)
 
 void rtt_lite_trace_name(u32_t resource_id, const char *name)
 {
-	struct buffer_context buf = INIT_BUFFER_CONTEXT;
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 	send_timeless(EV_RES_NAME, resource_id);
 	send_buffers(&buf, name, strlen(name) + 1);
