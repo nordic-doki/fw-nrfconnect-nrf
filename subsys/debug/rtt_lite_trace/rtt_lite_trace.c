@@ -10,6 +10,9 @@
 #include <nrfx_timer.h>
 #include <stdarg.h>
 
+#define PROTOCOL_VERSION 0
+
+#define EV_NUMBER_FIRST 0x01000000
 
 /*
  * Events with 24-bit additional parameter.
@@ -23,7 +26,7 @@
  *
  * This event is placed at the end of RTT buffer, so it is send each time
  * RTT buffer cycles back to the beginning.
- * @param additional Unused
+ * @param additional Protocol version
  * @param param      If CONFIG_RTT_LITE_TRACE_FAST_OVERFLOW_CHECK is set then
  *         it contains 1 on bit 0 and RTT buffer cycle counter on the rest of
  *         bits. Else it contains minimum free space of RTT buffer if
@@ -31,67 +34,39 @@
  */
 #define EV_CYCLE 0x01000000
 
-/** @brief Event reporting change of thread priority.
- *
- * @param additional Thread priority. Additionally bit 23 is set if thread is
- *         an idle thread.
- * @param param      Thread id.
- */
-#define EV_THREAD_PRIORITY 0x02000000
-
-/** @brief Event that starts series of thread information events.
+/** @brief Event containing thread information.
  * 
- * Thread information is dived into 3-byte parts to fit into events that are
- * constant size and also contains thread id. It have following structure:
+ * Buffer containing additional information is send before this event
+ * if bit 17 or above is not zero.
  * 
  * +---------+----------------------------------------------------+
  * | Size    | Description                                        |
  * | (bytes) |                                                    |
  * +=========+====================================================+
- * | 3       | Stack size or zero if system does not provide such |
- * |         | information.                                       |
+ * | 0 or 4  | Stack size.                                        |
  * +---------+----------------------------------------------------+
- * | 4       | Stack base address or zero if system does not      |
- * |         | provide such information. Additionally bit 0 is    |
- * |         | set if thread is an idle thread.                   |
+ * | 0 or 4  | Stack base address.                                |
  * +---------+----------------------------------------------------+
- * | 1       | Thread priority.                                   |
- * +---------+----------------------------------------------------+
- * | 0..n    | Thread name string or empty string if system does  |
- * |         | not provide such information. It is NOT null       |
- * |         | terminated.                                        |
- * +---------+----------------------------------------------------+
- * | 0..2    | Zero padding to fit into 3-byte parts.             |
+ * | 0..n    | Thread name string. It is NOT null terminated.     |
  * +---------+----------------------------------------------------+
  *
- * @param additional First 3 bytes of thread information.
+ * @param additional Bits 0..15 - thread priority,
+ * 		     Bit     16 - set if this is an idle thread,
+ * 		     Bit     17 - set if the stack info is provided,
+ * 		     Bit     18 - set if the name is provided.
  * @param param      Thread id.
  */
-#define EV_THREAD_INFO_BEGIN 0x03000000
-
-/** @brief Event that sends next part of thread information.
- *
- * @param additional Next 3 bytes of thread information.
- * @param param      Thread id.
- */
-#define EV_THREAD_INFO_NEXT 0x04000000
-
-/** @brief Event that sends last part of thread information.
- *
- * @param additional Last 3 bytes of thread information.
- * @param param      Thread id.
- */
-#define EV_THREAD_INFO_END 0x05000000
+#define EV_THREAD_INFO 0x02000000
 
 /** @brief Sends format information for formatted text output.
  * 
  * Buffer containing format string is send immediately before this event.
  * It is not null-terminated.
- *
+ * 
  * @param additional Unused.
- * @param param      Format id.
+ * @param param      Format id. See EV_PRINTF for details.
  */
-#define EV_FORMAT 0x06000000
+#define EV_FORMAT 0x03000000
 
 /** @brief Start sending buffer.
  * 
@@ -102,14 +77,14 @@
  * @param additional Next 3 bytes of the buffer.
  * @param param      First 4 bytes of the buffer.
  */
-#define EV_BUFFER_BEGIN 0x07000000
+#define EV_BUFFER_BEGIN 0x04000000
 
 /** @brief Continue sending buffer.
  * 
  * @param additional Next 3 bytes of the buffer that follows bytes from param.
  * @param param      Next 4 bytes of the buffer.
  */
-#define EV_BUFFER_NEXT 0x08000000
+#define EV_BUFFER_NEXT 0x05000000
 
 /** @brief Continue sending buffer.
  * 
@@ -119,7 +94,7 @@
  *         entirety.
  * @param param      Next 4 bytes of the buffer.
  */
-#define EV_BUFFER_END 0x09000000
+#define EV_BUFFER_END 0x06000000
 
 /** @brief Send small buffer in one pice.
  * 
@@ -130,16 +105,16 @@
  *         event, because the buffer may not fill this event entirety.
  * @param param      First 4 bytes of the buffer.
  */
-#define EV_BUFFER_BEGIN_END 0x0A000000
+#define EV_BUFFER_BEGIN_END 0x07000000
 
 /** @brief Event that gives a name of a resource for pritty printing.
  * 
- * Buffer containing resource name is send immediately after this event.
+ * Buffer containing resource name is send immediately before this event.
  * 
  * @param additional  Unused.
  * @param param       Resource id which is usually pointer to it.
  */
-#define EV_RES_NAME 0x0B000000
+#define EV_RES_NAME 0x08000000
 
 
 /*
@@ -150,109 +125,114 @@
  *     t - time stamp
  */
 
-/** @brief Event send as the first event after the system reset.
- * 
- * @param param      Unused.
- */
-#define EV_SYSTEM_RESET 0x11000000
-
 /** @brief Event send if RTT buffer cannot fit next event.
  * 
  * @param param      Number of events that were skipped because of overflow.
  */
-#define EV_OVERFLOW 0x12000000
+#define EV_OVERFLOW 0x09000000
 
 /** @brief Event send when systems goes into idle.
  * 
  * @param param       The same as EV_CYCLE.
  */
-#define EV_IDLE 0x13000000
+#define EV_IDLE 0x0A000000
 
 /** @brief Event send when systems starts executing a thread.
  * 
  * @param param       Thread id.
  */
-#define EV_THREAD_START 0x14000000
+#define EV_THREAD_START 0x0B000000
 
 /** @brief Event send when systems stops executing a thread and goes to
  *  the scheduler.
  * 
  * @param param       Thread id.
  */
-#define EV_THREAD_STOP 0x15000000
+#define EV_THREAD_STOP 0x0C000000
 
 /** @brief Event send when systems creates a new thread.
  * 
  * @param param       New thread id.
  */
-#define EV_THREAD_CREATE 0x16000000
+#define EV_THREAD_CREATE 0x0D000000
 
 /** @brief Event send when a thread was suspended.
  * 
  * @param param       New thread id.
  */
-#define EV_THREAD_SUSPEND 0x17000000
+#define EV_THREAD_SUSPEND 0x0E000000
 
 /** @brief Event send when a thread was resumed.
  * 
  * @param param       New thread id.
  */
-#define EV_THREAD_RESUME 0x18000000
+#define EV_THREAD_RESUME 0x0F000000
+
+/** @brief Event send as the first event after the system reset.
+ * 
+ * @param param      Version of the protocol. Currently only 0.
+ */
+#define EV_SYSTEM_RESET 0x10000000
 
 /** @brief Event send when a thread is ready to be executed.
  * 
  * @param param       New thread id.
  */
-#define EV_THREAD_READY 0x19000000
+#define EV_THREAD_READY 0x11000000
 
 /** @brief Event send when a thread is peding.
  * 
  * @param param       New thread id.
  */
-#define EV_THREAD_PEND 0x1A000000
+#define EV_THREAD_PEND 0x12000000
 
 /** @brief Event send when a specific system function was called.
  * 
  * @param param       Function id, see SYS_TRACE_ID_xyz for full list.
  */
-#define EV_SYS_CALL 0x1B000000
+#define EV_SYS_CALL 0x13000000
 
 /** @brief Event send when a specific system function returned.
  * 
  * @param param       Function id, see SYS_TRACE_ID_xyz for full list.
  */
-#define EV_SYS_END_CALL 0x1C000000
+#define EV_SYS_END_CALL 0x14000000
 
 /** @brief Event send when currently running ISR exits.
  * 
  * @param param       Unused.
  */
-#define EV_ISR_EXIT 0x1D000000
+#define EV_ISR_EXIT 0x15000000
 
 /** @brief Event send to print when formated text.
  * 
- * Buffer is send immediately before this event. If format id is 0xFFFFFF it
- * contais format string and arguments list (see EV_FORMAT for details). After
- * that buffer contains arguments according to arguments list:
+ * Buffer is send immediately before this event if bit 31 of param is cleared.
+ * If format id is 0xFFFFFF it contais null terminated format string. After that
+ * it contains arguments according to arguments list:
  *     * FORMAT_ARG_INT32 - 4 byte integer,
  *     * FORMAT_ARG_INT64 - 8 byte integer,
  *     * FORMAT_ARG_STRING - null terminated text string.
- * 
- * @param param       Bits 0:23 - Id of previously send format or
- *         0xFFFFFF if format was contained in the buffer.
- *         Bits 24:31 - Level of the message, see RTT_LITE_TRACE_LEVEL_xyz.
+ *
+ * Format id is following:
+ *	Bits  0:23 - Unique number of the format string or 0xFFFFFF to indicate
+ *		     that format string was added to the beginning of the buffer.
+ *      Bits 24:30 - Level of the message, see RTT_LITE_TRACE_LEVEL_xyz.
+ *	Bit     31 - If set, indicates that before this event buffer was send.
+ *		     Buffer may be skipped if format string was send before with
+ *		     EV_FORMAT event and it does not contains any arguments.
+ *
+ * @param param   Format id.
  */
-#define EV_PRINTF 0x1E000000
+#define EV_PRINTF 0x16000000
 
 /** @brief Event send to print a string.
  * 
- * If string is longer than 3 characters buffer is send immediately before this
- * event containign the rest of the string (not including null terminator).
+ * Buffer is send immediately before this event containing the string
+ * (without null terminator).
  * 
- * @param param       First 4 characters of the string including null
- *         terminator.
+ * @param param Level of the message, see RTT_LITE_TRACE_LEVEL_xyz.
  */
-#define EV_PRINT 0x1F000000
+#define EV_PRINT 0x17000000
 
 /** @brief Event send periodically to allow synchronization of the stream.
  * 
@@ -262,7 +242,7 @@
  * @param additional  Always SYNC_ADDITIONAL.
  * @param param       Always SYNC_PARAM.
  */
-#define EV_SYNC_FIRST 0x78000000
+#define EV_SYNC_FIRST 0x7C000000
 
 /*
  * Events with 24-bit time stamp and 7-bit ISR number.
@@ -281,8 +261,8 @@
 #define EV_ISR_ENTER 0x80000000
 
 
-#define SYNC_ADDITIONAL 0x007C7E79
-#define SYNC_PARAM 0x7F7D7A7B
+#define SYNC_ADDITIONAL 0x007F7E7D
+#define SYNC_PARAM 0x7F7D7E7F
 
 #define FORMAT_ARG_END 0
 #define FORMAT_ARG_INT32 1
@@ -443,42 +423,41 @@ static void send_short(u32_t event)
 
 static void send_thread_info(k_tid_t thread)
 {
-	u32_t param;
-	u32_t size = 0;
-	u32_t start = 0;
-	const u8_t *name;
+	u32_t param = 0;
 	u8_t prio;
 	u32_t is_idle;
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
 #if defined(CONFIG_THREAD_STACK_INFO)
-	size = thread->stack_info.size;
-	start = thread->stack_info.start;
-#endif /* CONFIG_THREAD_STACK_INFO */
-	name = (const u8_t *)k_thread_name_get(thread);
-	prio = (u8_t)thread->base.prio;
-	is_idle = z_is_idle_thread_object(thread) ? 1 : 0;
+	{
+		u32_t size = thread->stack_info.size;
+		u32_t start = thread->stack_info.start;
 
-	send_timeless(EV_THREAD_INFO_BEGIN | (size & 0xFFFFFF), (u32_t)thread);
-	send_timeless(EV_THREAD_INFO_NEXT | (start & 0xFFFFFE) | is_idle,
-		(u32_t)thread);
-	param = (start >> 24) | ((u32_t)prio << 8);
-	if (IS_ENABLED(CONFIG_THREAD_NAME) && name != NULL && name[0] != 0) {
-		param |= (u32_t)name[0] << 16;
-		name++;
-		while (name[-1] != 0 && name[0] != 0 && name[1] != 0) {
-			send_timeless(EV_THREAD_INFO_NEXT | param,
-					(u32_t)thread);
-			param = (u32_t)name[0] | ((u32_t)name[1] << 8)
-					| ((u32_t)name[2] << 16);
-			name += 3;
-		}
-		if (name[-1] != 0 && name[0] != 0) {
-			send_timeless(EV_THREAD_INFO_NEXT | param,
-					(u32_t)thread);
-			param = (u32_t)name[0];
+		send_buffers(&buf, &size, sizeof(size));
+		send_buffers(&buf, &start, sizeof(start));
+		param = THREAD_INFO_STACK_SET;
+	}
+#endif /* CONFIG_THREAD_STACK_INFO */
+
+	if (IS_ENABLED(CONFIG_THREAD_NAME) {
+		const u8_t *name = (const u8_t *)k_thread_name_get(thread);
+
+		if (name != NULL && name[0] != 0) {
+			send_buffers(&buf, name, strlen(name));
+			param |= THREAD_INFO_NAME_SET;
 		}
 	}
-	send_timeless(EV_THREAD_INFO_END | param, (u32_t)thread);
+
+	if (param) {
+		done_buffers(&buf);
+	}
+
+	param |= (u32_t)(u8_t)thread->base.prio;
+	if (z_is_idle_thread_object(thread)) {
+		param |= THREAD_INFO_IDLE;
+	}
+
+	send_timeless(EV_THREAD_INFO | param, (u32_t)thread);
 }
 
 static void send_periodic_thread_info(void)
@@ -534,7 +513,7 @@ static void initialize(void)
 		RTT_BUFFER_U32(RTT_BUFFER_BYTES + 8) = EV_SYNC_FIRST | SYNC_ADDITIONAL;
 		RTT_BUFFER_U32(RTT_BUFFER_BYTES + 12) = SYNC_PARAM;
 		send_timeless(EV_SYNC_FIRST | SYNC_ADDITIONAL, SYNC_PARAM);
-		send_short(EV_SYSTEM_RESET);
+		send_event(EV_SYSTEM_RESET, 0);
 
 		initialized = true;
 	}
@@ -576,8 +555,9 @@ void sys_trace_idle(void)
 void sys_trace_thread_priority_set(k_tid_t thread)
 {
 	u8_t prio = (u8_t)thread->base.prio;
-	u32_t idle = z_is_idle_thread_object(thread) ? 0x00800000 : 0;
-	send_timeless(EV_THREAD_PRIORITY | (u32_t)prio | idle, (u32_t)thread);
+	u32_t idle = z_is_idle_thread_object(thread) ? 0x10000 : 0;
+
+	send_timeless(EV_THREAD_INFO | (u32_t)prio | idle, (u32_t)thread);
 }
 
 void sys_trace_thread_create(k_tid_t thread)
@@ -743,8 +723,14 @@ static void prepare_format(struct rtt_lite_trace_format *format)
 	static volatile u32_t last_format_id; /* zero-initialied after reset */
 	u32_t this_format_id;
 	int key;
+	u32_t id_high;
 
 	parse_format_args(format);
+
+	id_high = (u32_t)format->level << 24;
+	if (!IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE) || format->args[0]) {
+		id_high |= 0x80000000;
+	}
 
 	if (IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
 		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
@@ -754,54 +740,56 @@ static void prepare_format(struct rtt_lite_trace_format *format)
 		last_format_id = this_format_id;
 		irq_unlock(key);
 
-		this_format_id |= ((u32_t)format->level << 24);
+		this_format_id |= id_high;
 		send_buffers(&buf, format->text, strlen(format->text));
 		done_buffers(&buf);
 		send_timeless(EV_FORMAT, this_format_id);
 		format->id = this_format_id;
 	} else {
-		format->id = 0x00FFFFFF;
-		format->id |= ((u32_t)format->level << 24);
+		format->id = 0x00FFFFFF | id_high;
 	}
 }
 
 void rtt_lite_trace_printf(struct rtt_lite_trace_format *format, ...)
 {
-	u32_t val32;
-	u64_t val64;
-	const char *val_str;
-	va_list vl;
-	u8_t *p;
-	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
-
 	if (format->id == 0) {
 		prepare_format(format);
 	}
-	if (!IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
-		send_buffers(&buf, format->text, strlen(format->text) + 1);
-		send_buffers(&buf, format->args, strlen(format->args));
-	}
-	p = format->args;
-	va_start(vl, format);
-	while (*p != FORMAT_ARG_END) {
-		switch (*p) {
-		case FORMAT_ARG_INT32:
-			val32 = va_arg(vl, u32_t);
-			send_buffers(&buf, &val32, 4);
-			break;
-		case FORMAT_ARG_INT64:
-			val64 = va_arg(vl, u64_t);
-			send_buffers(&buf, &val64, 8);
-			break;
-		case FORMAT_ARG_STRING:
-			val_str = va_arg(vl, const char *);
-			send_buffers(&buf, val_str, strlen(val_str) + 1);
-			break;
+
+	if (format->id & 0x80000000) {
+		u32_t val32;
+		u64_t val64;
+		const char *val_str;
+		va_list vl;
+		u8_t *p;
+		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
+
+		if (!IS_ENABLED(CONFIG_RTT_LITE_TRACE_FORMAT_ONCE)) {
+			send_buffers(&buf, format->text, strlen(format->text) + 1);
 		}
-		p++;
+		p = format->args;
+		va_start(vl, format);
+		while (*p != FORMAT_ARG_END) {
+			switch (*p) {
+			case FORMAT_ARG_INT32:
+				val32 = va_arg(vl, u32_t);
+				send_buffers(&buf, &val32, 4);
+				break;
+			case FORMAT_ARG_INT64:
+				val64 = va_arg(vl, u64_t);
+				send_buffers(&buf, &val64, 8);
+				break;
+			case FORMAT_ARG_STRING:
+				val_str = va_arg(vl, const char *);
+				send_buffers(&buf, val_str, strlen(val_str) + 1);
+				break;
+			}
+			p++;
+		}
+		va_end(vl);
+		done_buffers(&buf);
 	}
-	va_end(vl);
-	done_buffers(&buf);
+
 	rtt_lite_trace_event(EV_PRINTF, format->id);
 }
 
@@ -812,23 +800,11 @@ u32_t rtt_lite_trace_time(void)
 
 void rtt_lite_trace_print(u32_t level, const char *text)
 {
-	union {
-		u32_t out;
-		char in[4];
-	} conv;
-	size_t len = strlen(text);
+	struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
 
-	if (len <= 3) {
-		strcpy(conv.in, text);
-		rtt_lite_trace_event(EV_PRINT, conv.out);
-	} else {
-		struct send_buffer_context buf = INIT_SEND_BUFFER_CONTEXT;
-
-		memcpy(conv.in, text, 4);
-		send_buffers(&buf, &text[4], len - 4);
-		done_buffers(&buf);
-		rtt_lite_trace_event(EV_PRINT, conv.out);
-	}
+	send_buffers(&buf, text, strlen(text));
+	done_buffers(&buf);
+	rtt_lite_trace_event(EV_PRINT, level);
 }
 
 void rtt_lite_trace_event(u32_t event, u32_t param)
