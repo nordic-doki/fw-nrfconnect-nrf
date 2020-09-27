@@ -11,7 +11,7 @@ menuconfig RTT_LITE_TRACE
 	select RTT_CONSOLE
 	select THREAD_MONITOR
 	select TRACING
-	select TRACING_CUSTOM
+	select TRACING_EXTERNAL
 	help
 	  Enable RTT lite system tracing module which sends system tracing
 	  events via RTT. It uses custom tracing format of traces that was
@@ -23,6 +23,7 @@ if RTT_LITE_TRACE
 
 config RTT_LITE_TRACE_IRQ
 	bool "Trace IRQ enter and exit"
+	select TRACING_ISR
 	default y
 	help
 	  Put IRQ enter and exit in traces.
@@ -31,7 +32,7 @@ config RTT_LITE_TRACE_SYNCHRO
 	bool "Trace threads synchronization calls"
 	default y
 	help
-	  Put threads synchronization calls, i.e. mutex and semafor handling
+	  Put threads synchronization calls, i.e. mutex and semaphore handling
 	  in traces.
 
 config RTT_LITE_TRACE_THREAD_INFO
@@ -45,11 +46,11 @@ config RTT_LITE_TRACE_THREAD_INFO
 config RTT_LITE_TRACE_FAST_OVERFLOW_CHECK
 	bool "Fast buffer overflow check"
 	help
-	  Do fast overflow detection. It will slightly impact on trace
+	  Do fast overflow detection. It will slightly increase trace
 	  performance. It sends information needed to detect overflow once per
 	  size of RTT buffer and before entering idle. If none of this happened
 	  between overrun start and end of trace capturing then overflow will
-	  not be detected. With this option set you have to capture traces
+	  not be detected. With this option set you should capture traces
 	  a little longer, enough to make sure that all overflows were detected.
 
 config RTT_LITE_TRACE_BUFFER_STATS
@@ -59,7 +60,7 @@ config RTT_LITE_TRACE_BUFFER_STATS
 	  Report peak RTT buffer usage.
 
 config RTT_LITE_TRACE_PRINTF_MAX_ARGS
-	int "Maximum number of arguments in formated output"
+	int "Maximum number of arguments in formatted output"
 	range 1 255
 	default 6
 	help
@@ -71,7 +72,7 @@ config RTT_LITE_TRACE_FORMAT_ONCE
 	help
 	  Send format string only once before first use. This reduces trace
 	  size and time overhead, but if capturing is not started on system
-	  reset then some strings may be incorrectly formated.
+	  reset then some strings may be incorrectly formatted.
 
 config RTT_LITE_TRACE_RTT_CHANNEL
 	int "RTT channel number"
@@ -82,8 +83,7 @@ config RTT_LITE_TRACE_RTT_CHANNEL
 	range 1 5 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 6
 	range 1 6 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 7
 	range 1 7 if SEGGER_RTT_MAX_NUM_UP_BUFFERS = 8
-	default 1 if SEGGER_RTT_MAX_NUM_UP_BUFFERS <= 2
-	default 2
+	default 1
 	help
 	  RTT channel that will be used to send tracing information. Host side
 	  application will not relay on this number, but it will search channel
@@ -148,9 +148,12 @@ config RTT_LITE_TRACE_BUFFER_SIZE_32KB
 config RTT_LITE_TRACE_BUFFER_SIZE_64KB
 	bool "64KB, 8192 events"
 
+config RTT_LITE_TRACE_BUFFER_SIZE_128KB
+	bool "128KB, 16384 events"
+
 endchoice
 
-config TRACING_CUSTOM_INCLUDE
+config TRACING_EXTERNAL_INCLUDE
 	string
 	default "debug/rtt_lite_trace.h"
 

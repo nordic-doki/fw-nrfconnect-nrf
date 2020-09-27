@@ -9,4 +9,5 @@ zephyr_sources(rtt_lite_trace.c)
 zephyr_library_include_directories(
     ${ZEPHYR_BASE}/kernel/include
     ${ZEPHYR_BASE}/arch/${ARCH}/include
+    .
     )
