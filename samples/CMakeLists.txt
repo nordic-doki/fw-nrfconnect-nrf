@@ -143,3 +143,35 @@ if (CONFIG_NCS_SAMPLE_EMPTY_APP_CORE_CHILD_IMAGE)
     DOMAIN CPUAPP
     BOARD ${CONFIG_DOMAIN_CPUAPP_BOARD})
 endif()
+
+if (CONFIG_BT_RPC)
+  if (CONFIG_SOC_NRF5340_CPUAPP)
+    message("Adding 'rpc_host' firmware as child image since "
+      "CONFIG_BT_RPC is set to 'y'")
+
+      if (CONFIG_BOOTLOADER_MCUBOOT AND CONFIG_NRF53_UPGRADE_NETWORK_CORE)
+      # Inject this configuration from parent image hci_rpmsg to enable
+      # secure bootloader on the network core. This enables firmware update
+      # of the network core application.
+      add_overlay_config(
+        ${NETCORE_IMAGE}
+        "${ZEPHYR_NRF_MODULE_DIR}/subsys/bootloader/image/secure_boot.conf"
+        )
+
+      # Inject this configuration from parent image mcuboot to enable
+      # the PCD subsystem which is used to communicate the firmware update
+      # to the network core bootloader.
+      add_overlay_config(
+        mcuboot
+        "${ZEPHYR_NRF_MODULE_DIR}/subsys/pcd/pcd.conf"
+        )
+    endif()
+
+    add_child_image(
+      NAME rpc_host
+      SOURCE_DIR ${NRF_DIR}/samples/bluetooth/rpc_host
+      DOMAIN CPUAPP
+      BOARD ${CONFIG_DOMAIN_CPUNET_BOARD}
+    )
+  endif()
+endif()

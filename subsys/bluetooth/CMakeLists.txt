@@ -14,3 +14,7 @@ add_subdirectory_ifdef(CONFIG_BT_LL_SOFTDEVICE controller)
 add_subdirectory_ifdef(CONFIG_BT_MESH mesh)
 
 add_subdirectory_ifdef(CONFIG_BT_NRF_SERVICES services)
+
+add_subdirectory_ifdef(CONFIG_BT_RPC rpc/common)
+add_subdirectory_ifdef(CONFIG_BT_RPC_CLIENT rpc/client)
+add_subdirectory_ifdef(CONFIG_BT_RPC_HOST rpc/host)
