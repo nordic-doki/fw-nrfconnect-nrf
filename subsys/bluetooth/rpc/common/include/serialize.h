@@ -21,18 +21,19 @@
 #define SERIALIZE(...)
 #endif
 
-/** @brief Get a scratchpad size aligned to 4 multiple boundary.
+/** @brief Get a scratchpad item size aligned to 4-byte boundary.
  * 
- * @param[in] size scratchpad size
+ * @param[in] size scratchpad item size
  * 
- * @retval The scratchpad size rounded up to the 4 multiple.
+ * @retval The scratchpad item size rounded up to the next multiple of 4.
 */
 #define SCRATCHPAD_ALIGN(size) ROUND_UP(size, 4)
 
 /** @brief Alloc the scratchpad. Scratchpad is used to store a data when decoding serialized data.
  * 
  *  @param[in] _scratchpad Scratchpad name.
- *  @param[in] _value Cbor value to decode.
+ *  @param[in] _value Cbor value to decode. One unsigned integer will be decoded
+ *                    from this value that contains scratchpad buffer size.
  */
 #define SER_SCRATCHPAD_ALLOC(_scratchpad, _value) \
 	(_scratchpad)->value = _value; \
@@ -58,13 +59,13 @@ struct ser_scratchpad {
 	size_t size;
 };
 
-/** @brief Get the scratchpad of a given size.
- *         The scratchpad size will be round up to multiple of 4.
+/** @brief Get the scratchpad item of a given size.
+ *         The scratchpad item size will be round up to multiple of 4.
  * 
  * @param[in] scratchpad Scratchpad.
- * @param[in] size Scratchpad size.
+ * @param[in] size Scratchpad item size.
  * 
- * @retval Pointer to the scratchpad data.
+ * @retval Pointer to the scratchpad item data.
  */
 void *ser_scratchpad_get(struct ser_scratchpad *scratchpad, size_t size);
 
@@ -132,15 +133,18 @@ void ser_encode_buffer(CborEncoder *encoder, const void *data, size_t size);
 
 /** @brief Encode a callback.
  * 
+ * This function will use callback proxy module to convert a callback pointer
+ * to an integer value (slot number).
+ * 
  * @param[in, out] encoder Structure used to encode CBOR stream.
  * @param[in] callback Callback to encode.
  */
 void ser_encode_callback(CborEncoder *encoder, void *callback);
 
-/** @brief Encode a callback slot value.
+/** @brief Encode a callback slot number.
  * 
  * @param[in, out] encoder Structure used to encode CBOR stream.
- * @param[in] slot Callback slot to encode.
+ * @param[in] slot Callback slot number to encode.
  */
 static inline void ser_encode_callback_slot(CborEncoder *encoder, uint32_t slot)
 {
@@ -160,7 +164,7 @@ void ser_encoder_invalid(CborEncoder *encoder);
  */
 void ser_decode_skip(CborValue *value);
 
-/** @brief Check if value is a null.
+/** @brief Check if value is a null. This function will not consume the value.
  *
  * @param[in] value Value parsed from the CBOR stream.
  * 
@@ -169,7 +173,7 @@ void ser_decode_skip(CborValue *value);
  */
 bool ser_decode_is_null(CborValue *value);
 
-/** @brief Check if value is an undefined.
+/** @brief Check if value is an undefined. This function will not consume the value.
  *
  * @param[in] value Value parsed from the CBOR stream.
  * 
@@ -220,9 +224,9 @@ int64_t ser_decode_int64(CborValue *value);
 
 /** @brief Decode a string value.
  * 
- * @param[in] value Value parsed from the CBOR stream.
- * @param[in] buffer Buffer for decoded string.
- * @param[in] size Buffer size.
+ * @param[in]  value Value parsed from the CBOR stream.
+ * @param[out] buffer Buffer for decoded string.
+ * @param[in]  size Buffer size.
  */
 void ser_decode_str(CborValue *value, char *buffer, size_t size);
 
@@ -236,15 +240,15 @@ char *ser_decode_str_sp(struct ser_scratchpad *scratchpad);
 
 /** @brief Decode a buffer.
  * 
- * @param[in] value Value parsed from the CBOR stream.
- * @param[in] buffer Buffer for a decoded buffer data.
- * @param[in] size Buffer size.
+ * @param[in]  value Value parsed from the CBOR stream.
+ * @param[out] buffer Buffer for a decoded buffer data.
+ * @param[in]  size Buffer size.
  * 
  * @retval Pointer to a decoded buffer.
  */
 void *ser_decode_buffer(CborValue *value, void *buffer, size_t buffer_size);
 
-/** @brief Decode a buffer size
+/** @brief Decode a buffer size. This function will not consume the buffer.
  * 
  * @param[in] value Value parsed from the CBOR stream.
  * 
@@ -262,6 +266,9 @@ void *ser_decode_buffer_sp(struct ser_scratchpad *scratchpad);
 
 /** @brief Decode a callback.
  * 
+ * This function will use callback proxy module to associate decoded integer
+ * (slot number) with provided handler and returned function pointer.
+ * 
  * @param[in] value Value parsed from the CBOR stream.
  * @param[in] handler Function which will be called when callback returned by
  *                    this function is called. The handler must be defined by
@@ -269,9 +276,12 @@ void *ser_decode_buffer_sp(struct ser_scratchpad *scratchpad);
  * 
  * @retval Decoded callback.
  */
-void *ser_decode_callback(CborValue *value, void* handler);
+void *ser_decode_callback(CborValue *value, void *handler);
 
 /** @brief Decode callback slot.
+ * 
+ * This function will use callback proxy module to get callback associated with
+ * the decoded slot number.
  * 
  * @param[in] value Value parsed from the CBOR stream.
  * 

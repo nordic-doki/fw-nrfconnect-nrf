@@ -2,7 +2,7 @@
 
 Bluetooth: Host for nRF RPC BLE
 ###############################
-The nRF RPC Entropy sample demonstrates how to run the Bluetooth Low Energy stack on the another device or CPU using :ref:`nrfxlib:nrf_rpc` that exchange the function calls between cores using `Remote Procedure Calls (RPC)`_.
+The nRF RPC Host sample demonstrates how to run the Bluetooth Low Energy stack on the another device or CPU using :ref:`nrfxlib:nrf_rpc` that exchange the function calls between cores using `Remote Procedure Calls (RPC)`_.
 The sample makes use of the Bluetooth Low Energy on the Application core of an nRF5340 DK when full stack is running on the Network Core.
 
 Overview
@@ -10,7 +10,6 @@ Overview
 
 .. note::
    Currently a serialization of the :ref:`zephyr:bt_gap` and :ref:`zephyr:bluetooth_connection_mgmt` is supported.
-   The support for the :ref:`zephyr:bt_gatt` will be added in a future.
 
 The host (Network Core) is running full Bluetooth Low Energy stack.
 The application receives serialized function calls which are decoded and executed and next it sends a response data to the client (Application core). 
@@ -37,7 +36,7 @@ Building and Running
 Testing
 =======
 
-This sample must be build with the same Bluetooth configuration like the Application core sample.
+This sample must be build with the same Bluetooth configuration as the Application core sample.
 For more details see: :ref:`ble_rpc`.
 On the Application Core you can build the :ref:`zephyr: bluetooth-beacon-sample`.
 It works out of the box with this sample and does not require configuration change.

@@ -19,33 +19,33 @@
 
 #include "nrf_rpc_cbor.h"
 
-/** @brief Client commands and events IDs used in bluetooth API serialization.
- *         Those commands and events are sent from the client to the host.
+/** @brief Client commands IDs used in bluetooth API serialization.
+ *         Those commands are sent from the client to the host.
  */
 enum bt_rpc_cmd_from_cli_to_host
 {
 	/* bluetooth.h API */
-  	BT_RPC_GET_CHECK_TABLE_RPC_CMD,
-  	BT_ENABLE_RPC_CMD,
-  	BT_LE_ADV_START_RPC_CMD,
-  	BT_LE_ADV_STOP_RPC_CMD,
-  	BT_LE_SCAN_START_RPC_CMD,
-  	BT_SET_NAME_RPC_CMD,
-  	BT_GET_NAME_OUT_RPC_CMD,
-  	BT_SET_ID_ADDR_RPC_CMD,
-  	BT_ID_GET_RPC_CMD,
-  	BT_ID_CREATE_RPC_CMD,
-  	BT_ID_RESET_RPC_CMD,
-  	BT_ID_DELETE_RPC_CMD,
-  	BT_LE_ADV_UPDATE_DATA_RPC_CMD,
-  	BT_LE_EXT_ADV_CREATE_RPC_CMD,
-  	BT_LE_EXT_ADV_DELETE_RPC_CMD,
-  	BT_LE_EXT_ADV_START_RPC_CMD,
-  	BT_LE_EXT_ADV_STOP_RPC_CMD,
-  	BT_LE_EXT_ADV_SET_DATA_RPC_CMD,
-  	BT_LE_EXT_ADV_UPDATE_PARAM_RPC_CMD,
-  	BT_LE_EXT_ADV_GET_INDEX_RPC_CMD,
-  	BT_LE_EXT_ADV_GET_INFO_RPC_CMD,
+	BT_RPC_GET_CHECK_TABLE_RPC_CMD,
+	BT_ENABLE_RPC_CMD,
+	BT_LE_ADV_START_RPC_CMD,
+	BT_LE_ADV_STOP_RPC_CMD,
+	BT_LE_SCAN_START_RPC_CMD,
+	BT_SET_NAME_RPC_CMD,
+	BT_GET_NAME_OUT_RPC_CMD,
+	BT_SET_ID_ADDR_RPC_CMD,
+	BT_ID_GET_RPC_CMD,
+	BT_ID_CREATE_RPC_CMD,
+	BT_ID_RESET_RPC_CMD,
+	BT_ID_DELETE_RPC_CMD,
+	BT_LE_ADV_UPDATE_DATA_RPC_CMD,
+	BT_LE_EXT_ADV_CREATE_RPC_CMD,
+	BT_LE_EXT_ADV_DELETE_RPC_CMD,
+	BT_LE_EXT_ADV_START_RPC_CMD,
+	BT_LE_EXT_ADV_STOP_RPC_CMD,
+	BT_LE_EXT_ADV_SET_DATA_RPC_CMD,
+	BT_LE_EXT_ADV_UPDATE_PARAM_RPC_CMD,
+	BT_LE_EXT_ADV_GET_INDEX_RPC_CMD,
+	BT_LE_EXT_ADV_GET_INFO_RPC_CMD,
 	BT_LE_PER_ADV_SET_PARAM_RPC_CMD,
 	BT_LE_PER_ADV_SET_DATA_RPC_CMD,
 	BT_LE_PER_ADV_START_RPC_CMD,
@@ -63,16 +63,16 @@ enum bt_rpc_cmd_from_cli_to_host
 	BT_LE_PER_ADV_LIST_ADD_RPC_CMD,
 	BT_LE_PER_ADV_LIST_REMOVE_RPC_CMD,
 	BT_LE_PER_ADV_LIST_CLEAR_RPC_CMD,
-  	BT_LE_SCAN_STOP_RPC_CMD,
-  	BT_LE_SCAN_CB_REGISTER_ON_REMOTE_RPC_CMD,
-  	BT_LE_WHITELIST_ADD_RPC_CMD,
-  	BT_LE_WHITELIST_REM_RPC_CMD,
-  	BT_LE_WHITELIST_CLEAR_RPC_CMD,
-  	BT_LE_SET_CHAN_MAP_RPC_CMD,
-  	BT_LE_OOB_GET_LOCAL_RPC_CMD,
-  	BT_LE_EXT_ADV_OOB_GET_LOCAL_RPC_CMD,
-  	BT_UNPAIR_RPC_CMD,
-  	BT_FOREACH_BOND_RPC_CMD,
+	BT_LE_SCAN_STOP_RPC_CMD,
+	BT_LE_SCAN_CB_REGISTER_ON_REMOTE_RPC_CMD,
+	BT_LE_WHITELIST_ADD_RPC_CMD,
+	BT_LE_WHITELIST_REM_RPC_CMD,
+	BT_LE_WHITELIST_CLEAR_RPC_CMD,
+	BT_LE_SET_CHAN_MAP_RPC_CMD,
+	BT_LE_OOB_GET_LOCAL_RPC_CMD,
+	BT_LE_EXT_ADV_OOB_GET_LOCAL_RPC_CMD,
+	BT_UNPAIR_RPC_CMD,
+	BT_FOREACH_BOND_RPC_CMD,
 	/* conn.h API */
 	BT_CONN_REMOTE_UPDATE_REF_RPC_CMD,
 	BT_CONN_GET_INFO_RPC_CMD,
@@ -105,8 +105,8 @@ enum bt_rpc_cmd_from_cli_to_host
 	BT_CONN_GET_DST_OUT_RPC_CMD,
 };
 
-/** @brief Host commands and events IDs used in bluetooth API serialization.
- *         Those commands and events are sent from the host to the client.
+/** @brief Host commands IDs used in bluetooth API serialization.
+ *         Those commands are sent from the host to the client.
  */
 enum bt_rpc_cmd_from_host_to_cli
 {
@@ -145,8 +145,11 @@ enum bt_rpc_cmd_from_host_to_cli
 	BT_CONN_FOREACH_CB_CALLBACK_RPC_CMD,
 };
 
-/** @brief Bluetooth RPC callback ID. */
-enum {
+/** @brief Host events IDs used in bluetooth API serialization.
+ *         Those events are sent from the host to the client.
+ */
+enum bt_rpc_evt_from_host_to_cli {
+	/* bluetooth.h API */
 	BT_READY_CB_T_CALLBACK_RPC_EVT,
 };
 
@@ -178,26 +181,26 @@ typedef void (*bt_le_ext_adv_cb_scanned)(struct bt_le_ext_adv *adv,
 NRF_RPC_GROUP_DECLARE(bt_rpc_grp);
 
 #if defined(CONFIG_BT_RPC_HOST)
-/** @brief Check configuration table size
+/** @brief Read configuration "check table" from the host.
  * 
- * @param[in] data Pointer to received configuration table.
- * @param[in] size Received configuration table size.
+ * @param[out] data Pointer to received configuration table.
+ * @param[in]  size Size of data buffer.
  */
 void bt_rpc_get_check_table(uint8_t *data, size_t size);
 #else
-/** @brief Validate configuration table.
+/** @brief Validate configuration "check table" table.
  * 
  * @param[in] data Pointer to configuration table.
- * @param[in] size  Size of the configuration table.
+ * @param[in] size Size of the configuration table.
  * 
- * @retval True if configuration table is valid with own table.
+ * @retval True if provided table is matches with client's own table.
  *         Otherwise, false.
  */
 bool bt_rpc_validate_check_table(uint8_t* data, size_t size);
 
-/** @brief Get configuration table size.
+/** @brief Get configuration "check table" size.
  * 
- * @retval Configuration table size.
+ * @retval Configuration "check table" size.
  */
 size_t bt_rpc_calc_check_table_size(void);
 #endif
@@ -215,7 +218,7 @@ size_t bt_rpc_calc_check_table_size(void);
 
 /** @brief Reserve place in the RPC pool.
  *         
- * @param[in, out] pool mask Pool mask define by @ref BT_RPC_POOL_DEFINE.
+ * @param[in, out] pool_mask Pool mask defined by @ref BT_RPC_POOL_DEFINE.
  * 
  * @retval The first free index which can be taken in an associated array.
  */
@@ -237,7 +240,7 @@ void encode_bt_conn(CborEncoder *encoder, const struct bt_conn *conn);
 
 /** @brief Decode Bluetooth connection object.
  * 
- * param[in] value Cbor Value to decode.
+ * @param[in] value Cbor Value to decode.
  * 
  * @retval Connection object.
  */

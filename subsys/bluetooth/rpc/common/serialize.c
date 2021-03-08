@@ -162,7 +162,7 @@ void ser_encode_buffer(CborEncoder *encoder, const void *data, size_t size)
 	}
 }
 
-void ser_encode_callback(CborEncoder* encoder, void* callback)
+void ser_encode_callback(CborEncoder *encoder, void *callback)
 {
 	CborError err;
 	int slot;
@@ -186,7 +186,7 @@ void ser_encode_callback(CborEncoder* encoder, void* callback)
 		set_encoder_invalid(encoder, err);
 }
 
-void ser_encoder_invalid(CborEncoder* encoder)
+void ser_encoder_invalid(CborEncoder *encoder)
 {
 	set_encoder_invalid(encoder, CborErrorIO);
 }
@@ -506,7 +506,7 @@ error_exit:
 	return NULL;
 }
 
-void* ser_decode_callback_slot(CborValue *value)
+void *ser_decode_callback_slot(CborValue *value)
 {
 	int slot = ser_decode_uint(value);
 	void* result = cbkproxy_in_get(slot);
@@ -517,7 +517,7 @@ void* ser_decode_callback_slot(CborValue *value)
 	return result;
 }
 
-void* ser_decode_callback(CborValue *value, void* handler)
+void *ser_decode_callback(CborValue *value, void *handler)
 {
 	CborError err = CborErrorIllegalType;
 	int slot;

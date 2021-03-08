@@ -12,7 +12,6 @@ The full Bluetooth Low Energy stack can be ran on the another device or CPU in p
 
 .. note::
    Currently a serialization of the :ref:`zephyr:bt_gap` and :ref:`zephyr:bluetooth_connection_mgmt` is supported.
-   The support for the :ref:`zephyr:bt_gatt` will be added in a future.
 
 Network Core
 ************
@@ -70,4 +69,4 @@ The following options must have been set in the same way for the :ref:`ble_rpc_h
    * :option:`CONFIG_BT_DEVICE_NAME_MAX`
    * :option:`CONFIG_BT_PER_ADV_SYNC_MAX`
    * :option:`CONFIG_BT_DEVICE_NAME`
-   * :option:`CONFIG_CBKPROXY_OUT_SLOT` equal to :option:`CONFIG_CBKPROXY_IN_SLOTS`
+   * :option:`CONFIG_CBKPROXY_OUT_SLOT` on one core must be equal to :option:`CONFIG_CBKPROXY_IN_SLOTS` on the other
