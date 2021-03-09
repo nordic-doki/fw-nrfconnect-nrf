@@ -302,24 +302,6 @@ error_exit:
 	return 0;
 }
 
-void *ser_scratchpad_get(struct ser_scratchpad *scratchpad, size_t size)
-{
-	void *result;
-	size_t aligned_size;
-
-	aligned_size = SCRATCHPAD_ALIGN(size);
-
-	if (scratchpad->size < aligned_size) {
-		return NULL;
-	}
-
-	result = (void *)scratchpad->data;
-	scratchpad->data += aligned_size;
-	scratchpad->size -= aligned_size;
-
-	return result;
-}
-
 void *ser_decode_buffer(CborValue *value, void *buffer, size_t buffer_size)
 {
 	CborError err = CborErrorIllegalType;
@@ -406,7 +388,7 @@ error_exit:
 	return 0;
 }
 
-char *ser_decode_str_sp(struct ser_scratchpad *scratchpad)
+char *ser_decode_str_into_scratchpad(struct ser_scratchpad *scratchpad)
 {
 	CborValue* value = scratchpad->value;
 	CborError err = CborErrorIllegalType;
@@ -426,7 +408,7 @@ char *ser_decode_str_sp(struct ser_scratchpad *scratchpad)
 		if (err != CborNoError)
 			goto error_exit;
 
-		result = (char *)ser_scratchpad_get(scratchpad, len);
+		result = (char *)ser_scratchpad_add(scratchpad, len);
 		if (result == NULL) {
 			err = CborErrorIO;
 			goto error_exit;
@@ -456,7 +438,7 @@ error_exit:
 	return NULL;
 }
 
-void *ser_decode_buffer_sp(struct ser_scratchpad *scratchpad)
+void *ser_decode_buffer_into_scratchpad(struct ser_scratchpad *scratchpad)
 {
 	CborValue* value = scratchpad->value;
 	CborError err = CborErrorIllegalType;
@@ -476,7 +458,7 @@ void *ser_decode_buffer_sp(struct ser_scratchpad *scratchpad)
 		if (err != CborNoError)
 			goto error_exit;
 
-		result = ser_scratchpad_get(scratchpad, len);
+		result = ser_scratchpad_add(scratchpad, len);
 		if (result == NULL) {
 			err = CborErrorIO;
 			goto error_exit;
@@ -506,7 +488,7 @@ error_exit:
 	return NULL;
 }
 
-void *ser_decode_callback_slot(CborValue *value)
+void *ser_decode_callback_call(CborValue *value)
 {
 	int slot = ser_decode_uint(value);
 	void* result = cbkproxy_in_get(slot);
@@ -559,25 +541,25 @@ bool ser_decoding_done_and_check(CborValue *value)
 	return !is_decoder_invalid(value);
 }
 
-void ser_rsp_simple_i32(CborValue *value, void *handler_data)
+void ser_rsp_decode_i32(CborValue *value, void *handler_data)
 {
 	*(int32_t *)handler_data = ser_decode_int(value);
 	check_final_decode_valid(value);
 }
 
-void ser_rsp_simple_bool(CborValue *value, void *handler_data)
+void ser_rsp_decode_bool(CborValue *value, void *handler_data)
 {
 	*(bool *)handler_data = ser_decode_bool(value);
 	check_final_decode_valid(value);
 }
 
-void ser_rsp_simple_u8(CborValue *value, void *handler_data)
+void ser_rsp_decode_u8(CborValue *value, void *handler_data)
 {
 	*(uint8_t *)handler_data = ser_decode_int(value);
 	check_final_decode_valid(value);
 }
 
-void ser_rsp_simple_void(CborValue *value, void *handler_data)
+void ser_rsp_decode_void(CborValue *value, void *handler_data)
 {
 	ARG_UNUSED(value);
 	ARG_UNUSED(handler_data);

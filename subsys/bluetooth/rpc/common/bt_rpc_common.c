@@ -182,7 +182,7 @@ typedef struct check_list_entry str_check_list_entry_t;
 #endif
 
 /*
- * Default values that will be put into the check table if specific
+ * Default values that will be put into the check list if specific
  * configuration is not defined. Each define MUST end with a comma.
  * Mostly, it is the maximum integer value of a specific size.
  */
@@ -228,15 +228,15 @@ static const check_list_entry_t check_table[] = {
 	CHECK_UINT16_PAIR(CONFIG_CBKPROXY_OUT_SLOTS, CONFIG_CBKPROXY_IN_SLOTS),
 };
 
-static const str_check_list_entry_t str_check_table[] =
+static const str_check_list_entry_t str_check_list[] =
 	CHECK_STR_BEGIN()
 	CHECK_STR(CONFIG_BT_DEVICE_NAME)
 	CHECK_STR_END();
 
 #if defined(CONFIG_BT_RPC_HOST)
-void bt_rpc_get_check_table(uint8_t *data, size_t size)
+void bt_rpc_get_check_list(uint8_t *data, size_t size)
 {
-	size_t str_copy_bytes = sizeof(str_check_table);
+	size_t str_copy_bytes = sizeof(str_check_list);
 
 	memset(data, 0, size);
 
@@ -247,11 +247,11 @@ void bt_rpc_get_check_table(uint8_t *data, size_t size)
 	}
 
 	memcpy(data, check_table, sizeof(check_table));
-	memcpy(&data[sizeof(check_table)], str_check_table, str_copy_bytes);
+	memcpy(&data[sizeof(check_table)], str_check_list, str_copy_bytes);
 	
 	LOG_DBG("Check table size: %d+%d=%d (copied %d)", sizeof(check_table),
-		sizeof(str_check_table),
-		sizeof(check_table) + sizeof(str_check_table),
+		sizeof(str_check_list),
+		sizeof(check_table) + sizeof(str_check_list),
 		sizeof(check_table) + str_copy_bytes);
 }
 
@@ -364,7 +364,7 @@ static bool check_table_part(uint8_t **data, size_t *size,
 	return ok;
 }
 
-bool bt_rpc_validate_check_table(uint8_t *data, size_t size)
+bool bt_rpc_validate_check_list(uint8_t *data, size_t size)
 {
 	bool ok = true;
 
@@ -376,7 +376,7 @@ bool bt_rpc_validate_check_table(uint8_t *data, size_t size)
 	data[size - 1] = 0;
 
 	ok = check_table_part(&data, &size, check_table, ARRAY_SIZE(check_table));
-	ok = check_table_part(&data, &size, str_check_table, ARRAY_SIZE(str_check_table)) && ok;
+	ok = check_table_part(&data, &size, str_check_list, ARRAY_SIZE(str_check_list)) && ok;
 
 	if (size != 1) {
 		LOG_ERR("Missmatched BT RPC config.");
@@ -390,7 +390,7 @@ bool bt_rpc_validate_check_table(uint8_t *data, size_t size)
 	return ok;
 }
 
-size_t bt_rpc_calc_check_table_size(void)
+size_t bt_rpc_calc_check_list_size(void)
 {
 	size_t i;
 	size_t size = 0;
@@ -400,8 +400,8 @@ size_t bt_rpc_calc_check_table_size(void)
 		size += check_table[i].size;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(str_check_table); i++) {
-		str_size += strlen(str_check_table[i].str_value) + 1;
+	for (i = 0; i < ARRAY_SIZE(str_check_list); i++) {
+		str_size += strlen(str_check_list[i].str_value) + 1;
 	}
 	str_size++;
 

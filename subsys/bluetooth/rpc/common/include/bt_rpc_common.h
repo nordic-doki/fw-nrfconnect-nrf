@@ -25,7 +25,7 @@
 enum bt_rpc_cmd_from_cli_to_host
 {
 	/* bluetooth.h API */
-	BT_RPC_GET_CHECK_TABLE_RPC_CMD,
+	BT_RPC_GET_CHECK_LIST_RPC_CMD,
 	BT_ENABLE_RPC_CMD,
 	BT_LE_ADV_START_RPC_CMD,
 	BT_LE_ADV_STOP_RPC_CMD,
@@ -167,7 +167,11 @@ enum {
 	FLAG_PAIRING_FAILED_PRESENT   = BIT(8),
 };
 
-/* Helper callback definitions for connection API and Extended Advertising. */
+/* Helper callback definitions for connection API and Extended Advertising.
+ * Below callbacks have no theirs own typedefs in Bluetooth API, but instead
+ * they are defined directly in structures or function parameters. Decoders and
+ * encoders use variables of that types, so typedef is convinient in this place.
+ */
 typedef void (*bt_conn_foreach_cb)(struct bt_conn *conn, void *data);
 typedef void (*bt_foreach_bond_cb)(const struct bt_bond_info *info,
 				   void *user_data);
@@ -181,62 +185,36 @@ typedef void (*bt_le_ext_adv_cb_scanned)(struct bt_le_ext_adv *adv,
 NRF_RPC_GROUP_DECLARE(bt_rpc_grp);
 
 #if defined(CONFIG_BT_RPC_HOST)
-/** @brief Read configuration "check table" from the host.
+/** @brief Read configuration "check list" from the host.
  * 
- * @param[out] data Pointer to received configuration table.
+ * @param[out] data Pointer to received configuration "check list".
  * @param[in]  size Size of data buffer.
  */
-void bt_rpc_get_check_table(uint8_t *data, size_t size);
+void bt_rpc_get_check_list(uint8_t *data, size_t size);
 #else
-/** @brief Validate configuration "check table" table.
+/** @brief Validate configuration "check list".
  * 
- * @param[in] data Pointer to configuration table.
- * @param[in] size Size of the configuration table.
+ * @param[in] data Pointer to configuration "check list".
+ * @param[in] size Size of the configuration "check list".
  * 
- * @retval True if provided table is matches with client's own table.
+ * @retval True if provided "check list" is matches with client's own "check list".
  *         Otherwise, false.
  */
-bool bt_rpc_validate_check_table(uint8_t* data, size_t size);
+bool bt_rpc_validate_check_list(uint8_t* data, size_t size);
 
-/** @brief Get configuration "check table" size.
+/** @brief Get configuration "check list" size.
  * 
- * @retval Configuration "check table" size.
+ * @retval Configuration "check list" size.
  */
-size_t bt_rpc_calc_check_table_size(void);
+size_t bt_rpc_calc_check_list_size(void);
 #endif
-
-/** @brief Define the RPC pool. Pool is created as a bitmask which is useful to
- *         track which array indexes are used.
- * 
- * @param[in] name Pool name.
- * @param[in] size Pool size.
- */
-#define BT_RPC_POOL_DEFINE(name, size) \
-	BUILD_ASSERT(size > 0, "BT_RPC_POOL empty"); \
-	BUILD_ASSERT(size <= 32, "BT_RPC_POOL too big"); \
-	static atomic_t name = ~(((uint32_t)1 << (8 * sizeof(uint32_t) - (size))) - (uint32_t)1)
-
-/** @brief Reserve place in the RPC pool.
- *         
- * @param[in, out] pool_mask Pool mask defined by @ref BT_RPC_POOL_DEFINE.
- * 
- * @retval The first free index which can be taken in an associated array.
- */
-int bt_rpc_pool_reserve(atomic_t *pool_mask);
-
-/** @brief Release the item from the RPC pool.
- * 
- * @param[in, out] pool_mask Pool mask define by @ref BT_RPC_POOL_DEFINE.
- * @param[in] number The index/number to release.
- */
-void bt_rpc_pool_release(atomic_t *pool_mask, int number);
 
 /** @brief Encode Bluetooth connection object.
  * 
  * @param[in, out] encoder Cbor Encoder instance.
  * @param[in] conn Connection object to encode.
  */
-void encode_bt_conn(CborEncoder *encoder, const struct bt_conn *conn);
+void bt_rpc_encode_bt_conn(CborEncoder *encoder, const struct bt_conn *conn);
 
 /** @brief Decode Bluetooth connection object.
  * 
@@ -244,6 +222,6 @@ void encode_bt_conn(CborEncoder *encoder, const struct bt_conn *conn);
  * 
  * @retval Connection object.
  */
-struct bt_conn *decode_bt_conn(CborValue *value);
+struct bt_conn *bt_rpc_decode_bt_conn(CborValue *value);
 
 #endif /* BT_RPC_COMMON_H_ */

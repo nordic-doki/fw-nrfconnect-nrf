@@ -16,6 +16,8 @@
 #define SERIALIZE_H_
 
 #include "tinycbor/cbor.h"
+#include "net/buf.h"
+#include "sys/util.h"
 
 #ifndef SERIALIZE
 #define SERIALIZE(...)
@@ -27,7 +29,7 @@
  * 
  * @retval The scratchpad item size rounded up to the next multiple of 4.
 */
-#define SCRATCHPAD_ALIGN(size) ROUND_UP(size, 4)
+#define SCRATCHPAD_ALIGN(size) WB_UP(size)
 
 /** @brief Alloc the scratchpad. Scratchpad is used to store a data when decoding serialized data.
  * 
@@ -37,9 +39,10 @@
  */
 #define SER_SCRATCHPAD_ALLOC(_scratchpad, _value) \
 	(_scratchpad)->value = _value; \
-	(_scratchpad)->size = ser_decode_uint(_value); \
-	uint32_t _scratchpad_buf[SCRATCHPAD_ALIGN((_scratchpad)->size)]; \
-	(_scratchpad)->data = (uint8_t *)_scratchpad_buf
+	uint32_t _scratchpad_size = ser_decode_uint(_value); \
+	uint32_t _scratchpad_data[SCRATCHPAD_ALIGN(_scratchpad_size) / sizeof(uint32_t)]; \
+	net_buf_simple_init_with_data(&(_scratchpad)->buf, _scratchpad_data, _scratchpad_size);
+
 
 /** @brief Free the scratchpad.
  * 
@@ -52,11 +55,8 @@ struct ser_scratchpad {
 	/** Cbor value to decode. */
 	CborValue *value;
 
-	/** Pointer to scratchpad buffer. */
-	uint8_t *data;
-
-	/** Scratchpad buffer size. */
-	size_t size;
+	/** Data buffer. */
+	struct net_buf_simple buf;
 };
 
 /** @brief Get the scratchpad item of a given size.
@@ -67,7 +67,10 @@ struct ser_scratchpad {
  * 
  * @retval Pointer to the scratchpad item data.
  */
-void *ser_scratchpad_get(struct ser_scratchpad *scratchpad, size_t size);
+static inline void *ser_scratchpad_add(struct ser_scratchpad *scratchpad, size_t size)
+{
+	return net_buf_simple_add(&scratchpad->buf, SCRATCHPAD_ALIGN(size));
+}
 
 /** @brief Encode a null value.
  * 
@@ -146,7 +149,7 @@ void ser_encode_callback(CborEncoder *encoder, void *callback);
  * @param[in, out] encoder Structure used to encode CBOR stream.
  * @param[in] slot Callback slot number to encode.
  */
-static inline void ser_encode_callback_slot(CborEncoder *encoder, uint32_t slot)
+static inline void ser_encode_callback_call(CborEncoder *encoder, uint32_t slot)
 {
 	ser_encode_uint(encoder, slot);
 }
@@ -236,7 +239,7 @@ void ser_decode_str(CborValue *value, char *buffer, size_t size);
  * 
  * @retval Pointer to a decoded string.
  */
-char *ser_decode_str_sp(struct ser_scratchpad *scratchpad);
+char *ser_decode_str_into_scratchpad(struct ser_scratchpad *scratchpad);
 
 /** @brief Decode a buffer.
  * 
@@ -262,7 +265,7 @@ size_t ser_decode_buffer_size(CborValue *value);
  * 
  * @retval Pointer to a decoded buffer data.
  */
-void *ser_decode_buffer_sp(struct ser_scratchpad *scratchpad);
+void *ser_decode_buffer_into_scratchpad(struct ser_scratchpad *scratchpad);
 
 /** @brief Decode a callback.
  * 
@@ -287,7 +290,7 @@ void *ser_decode_callback(CborValue *value, void *handler);
  * 
  * @retval Callback assigned to the slot encoded in the value parameter.
  */
-void *ser_decode_callback_slot(CborValue *value);
+void *ser_decode_callback_call(CborValue *value);
 
 /** @brief Put decoder into an invalid state and set error code that caused it.
  *         All further decoding on this decoder will be ignored.
@@ -313,28 +316,28 @@ bool ser_decoding_done_and_check(CborValue *value);
  * @param[in] value Value parsed from the CBOR stream.
  * @param[in] handler_data Pointer to place where value will be decoded.
  */
-void ser_rsp_simple_bool(CborValue *value, void *handler_data);
+void ser_rsp_decode_bool(CborValue *value, void *handler_data);
 
 /** @brief Decode a command response as an unsigned 8-bit integer value.
  * 
  * @param[in] value Value parsed from the CBOR stream.
  * @param[in] handler_data Pointer to place where value will be decoded.
  */
-void ser_rsp_simple_u8(CborValue *value, void *handler_data);
+void ser_rsp_decode_u8(CborValue *value, void *handler_data);
 
 /** @brief Decode a command response as an integer value.
  * 
  * @param[in] value Value parsed from the CBOR stream.
  * @param[in] handler_data Pointer to place where value will be decoded.
  */
-void ser_rsp_simple_i32(CborValue *value, void *handler_data);
+void ser_rsp_decode_i32(CborValue *value, void *handler_data);
 
 /** @brief Decode a command response as a void value.
  * 
  * @param[in] value Value parsed from the CBOR stream.
  * @param[in] handler_data Pointer to place where value will be decoded.
  */
-void ser_rsp_simple_void(CborValue *value, void *handler_data);
+void ser_rsp_decode_void(CborValue *value, void *handler_data);
 
 /** @brief Sent response to a command as an integer value.
  * 
