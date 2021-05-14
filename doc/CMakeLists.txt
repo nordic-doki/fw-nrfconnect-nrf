@@ -179,15 +179,22 @@ if(NOT DEFINED ENV{NRFXLIB_BASE})
   set(ENV{NRFXLIB_BASE} ${NRFXLIB_BASE})
 endif()
 
+if(NOT DEFINED ENV{FIND_MY_BASE})
+  get_filename_component(FIND_MY_BASE ${CMAKE_CURRENT_LIST_DIR}/../../find-my/ REALPATH)
+  set(ENV{FIND_MY_BASE} ${FIND_MY_BASE})
+endif()
+
 message(STATUS "ZEPHYR_BASE: ${ZEPHYR_BASE}")
 message(STATUS "NRF_BASE: $ENV{NRF_BASE}")
 message(STATUS "MCUBOOT_BASE: $ENV{MCUBOOT_BASE}")
 message(STATUS "NRFXLIB_BASE: $ENV{NRFXLIB_BASE}")
+message(STATUS "FIND_MY_BASE: $ENV{FIND_MY_BASE}")
 
 set(ZEPHYR_BINARY_DIR ${CMAKE_BINARY_DIR}/zephyr)
 set(NRF_BINARY_DIR ${CMAKE_BINARY_DIR}/nrf)
 set(NRFXLIB_BINARY_DIR ${CMAKE_BINARY_DIR}/nrfxlib)
 set(KCONFIG_BINARY_DIR ${CMAKE_BINARY_DIR}/Kconfig)
+set(FIND_MY_BINARY_DIR ${CMAKE_BINARY_DIR}/find-my)
 
 # HTML output directory
 set(HTML_DIR ${CMAKE_BINARY_DIR}/html)
@@ -395,6 +402,17 @@ set_target_properties(
     ADDITIONAL_CLEAN_FILES "${KCONFIG_BINARY_DIR};${KCONFIG_OUTPUT}"
 )
 
+
+#-------------------------------------------------------------------------------
+# docset: find-my
+
+set(find_my_env
+  NRF_BASE=${NRF_BASE}
+  FIND_MY_BASE=${FIND_MY_BASE}
+)
+
+add_docset(find-my "${find_my_env}")
+
 #-------------------------------------------------------------------------------
 # Global targets
 
@@ -419,6 +437,7 @@ add_custom_target(
     zephyr-html-all
     mcuboot-html-all
     kconfig-html-all
+    find-my-html-all
 )
 
 add_custom_target(
